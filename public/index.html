@@ -366,12 +366,25 @@
     let term, fitAddon, ws;
     let reconnectTimer = null;
     let reconnectDelay = 1000;
+    let wsEverOpened = false;
 
     function showTerminal() {
       loginScreen.classList.add('hidden');
       terminalScreen.style.display = 'flex';
-      initTerminal();
-      connectWS();
+      // Delay init to ensure layout is computed after display change
+      setTimeout(() => {
+        initTerminal();
+        connectWS();
+      }, 50);
+    }
+
+    function backToLogin(msg) {
+      sessionStorage.removeItem('terminal_token');
+      authToken = null;
+      terminalScreen.style.display = 'none';
+      loginScreen.classList.remove('hidden');
+      loginError.textContent = msg || 'Please login again.';
+      passwordInput.focus();
     }
 
     function sendInput(data) {
@@ -419,6 +432,7 @@
 
       term.open(document.getElementById('terminal-container'));
       fitAddon.fit();
+      term.focus();
 
       // Clipboard helper (works on HTTP too)
       function copyToClipboard(text) {
@@ -646,10 +660,12 @@
       ws = new WebSocket(`${protocol}//${location.host}/ws?token=${encodeURIComponent(authToken)}`);
 
       ws.onopen = () => {
+        wsEverOpened = true;
         setStatus('connected', 'Connected');
         reconnectDelay = 1000;
-        // Send initial size
         if (term) {
+          fitAddon.fit();
+          term.focus();
           ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
         }
       };
@@ -669,13 +685,22 @@
       };
 
       ws.onclose = (event) => {
-        if (event.code === 4001 || event.reason === 'Unauthorized') {
-          sessionStorage.removeItem('terminal_token');
-          authToken = null;
-          terminalScreen.style.display = 'none';
-          loginScreen.classList.remove('hidden');
-          loginError.textContent = 'Session expired. Please login again.';
-          passwordInput.focus();
+        // Auth failure
+        if (event.code === 4001) {
+          backToLogin('Session expired. Please login again.');
+          return;
+        }
+
+        // Max sessions
+        if (event.code === 4002) {
+          term.write('\r\n\x1b[31m[Max sessions reached. Close other tabs and retry.]\x1b[0m\r\n');
+          setStatus('disconnected', 'Max sessions');
+          return;
+        }
+
+        // Connection never opened - likely auth or server issue
+        if (!wsEverOpened) {
+          backToLogin('Connection failed. Please login again.');
           return;
         }
 

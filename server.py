@@ -3,6 +3,7 @@ import fcntl
 import hashlib
 import hmac
 import json
+import logging
 import os
 import pty
 import secrets
@@ -13,6 +14,9 @@ import time
 from pathlib import Path
 
 from aiohttp import web
+
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+log = logging.getLogger('wt')
 
 # --- Load .env ---
 env_file = Path(__file__).parent / '.env'
@@ -115,7 +119,7 @@ class PtySession:
         if pid == 0:
             # Child process
             os.chdir(os.environ.get('HOME', '/'))
-            os.execvpe(SHELL, [SHELL], env)
+            os.execvpe(SHELL, [SHELL, '--login'], env)
         else:
             # Parent
             self.pid = pid
@@ -152,35 +156,22 @@ class PtySession:
             self.master_fd = None
 
     async def read_loop(self) -> None:
-        loop = asyncio.get_event_loop()
-        read_event = asyncio.Event()
-
-        def on_readable():
-            read_event.set()
-
         if self.master_fd is None:
             return
 
-        loop.add_reader(self.master_fd, on_readable)
-
         try:
-            while self.running:
-                read_event.clear()
+            while self.running and self.master_fd is not None:
                 try:
                     data = os.read(self.master_fd, 4096)
                     if not data:
                         break
                     await self.ws.send_json({'type': 'output', 'data': data.decode('utf-8', errors='replace')})
                 except BlockingIOError:
-                    await read_event.wait()
+                    await asyncio.sleep(0.01)
                 except OSError:
                     break
-        finally:
-            if self.master_fd is not None:
-                try:
-                    loop.remove_reader(self.master_fd)
-                except Exception:
-                    pass
+        except asyncio.CancelledError:
+            pass
 
         # Wait for child process
         if self.pid is not None:
@@ -200,26 +191,28 @@ class PtySession:
 async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     global active_pty_count
 
+    ws = web.WebSocketResponse()
+    await ws.prepare(request)
     token = request.query.get('token', '')
     cleanup_tokens()
 
     if not token or token not in active_tokens:
-        raise web.HTTPUnauthorized(text='Invalid token')
+        await ws.close(code=4001, message=b'Invalid token')
+        return ws
 
     if time.time() > active_tokens.get(token, 0):
         del active_tokens[token]
-        raise web.HTTPUnauthorized(text='Token expired')
+        await ws.close(code=4001, message=b'Token expired')
+        return ws
 
     if active_pty_count >= MAX_SESSIONS:
-        raise web.HTTPServiceUnavailable(text='Max sessions reached')
-
-    ws = web.WebSocketResponse()
-    await ws.prepare(request)
+        await ws.close(code=4002, message=b'Max sessions reached')
+        return ws
 
     session = PtySession(ws)
     session.spawn()
     active_pty_count += 1
-    print(f'PTY opened (pid: {session.pid}, active: {active_pty_count})')
+    log.info(f'PTY opened (pid: {session.pid}, active: {active_pty_count})')
 
     # Start reading PTY output
     read_task = asyncio.create_task(session.read_loop())
@@ -247,7 +240,7 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
         except asyncio.CancelledError:
             pass
         active_pty_count -= 1
-        print(f'PTY closed (pid: {session.pid}, active: {active_pty_count})')
+        log.info(f'PTY closed (active: {active_pty_count})')
 
     return ws
 
@@ -255,8 +248,11 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
 # --- App ---
 
 @routes.get('/')
-async def index_handler(request: web.Request) -> web.FileResponse:
-    return web.FileResponse(Path(__file__).parent / 'public' / 'index.html')
+async def index_handler(request: web.Request) -> web.Response:
+    html = (Path(__file__).parent / 'public' / 'index.html').read_text()
+    return web.Response(text=html, content_type='text/html', headers={
+        'Cache-Control': 'no-cache, no-store, must-revalidate',
+    })
 
 
 app = web.Application()
@@ -265,13 +261,13 @@ app.router.add_static('/static', Path(__file__).parent / 'public')
 
 if __name__ == '__main__':
     import socket
-    print(f'Web Terminal running at http://0.0.0.0:{PORT}')
+    log.info(f'Web Terminal running at http://0.0.0.0:{PORT}')
     try:
         hostname = socket.gethostname()
         for info in socket.getaddrinfo(hostname, None, socket.AF_INET):
             addr = info[4][0]
             if not addr.startswith('127.'):
-                print(f'  -> http://{addr}:{PORT}')
+                log.info(f'  -> http://{addr}:{PORT}')
     except Exception:
         pass
     web.run_app(app, host='0.0.0.0', port=PORT, print=None)
