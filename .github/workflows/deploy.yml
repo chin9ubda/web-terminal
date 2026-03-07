@@ -1,0 +1,25 @@
+name: Build & Push to Docker Hub
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  build-and-push:
+    runs-on: self-hosted
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u "${{ secrets.DOCKERHUB_USERNAME }}" --password-stdin
+
+      - name: Build and push
+        run: |
+          docker build -t chanki87/web-terminal:latest .
+          docker push chanki87/web-terminal:latest
+
+      - name: Deploy locally
+        run: |
+          docker stop web-terminal || true
+          docker rm web-terminal || true
+          cd /data/docker/web-terminal && docker compose pull && docker compose up -d
