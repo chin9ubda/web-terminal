@@ -197,6 +197,65 @@
     }
 
     .hidden { display: none !important; }
+
+    /* --- Select Overlay --- */
+    #select-overlay {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: #1a1b26;
+      z-index: 10;
+      flex-direction: column;
+    }
+
+    #select-overlay.active {
+      display: flex;
+    }
+
+    #select-overlay-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: #24283b;
+      flex-shrink: 0;
+    }
+
+    #select-overlay-header button {
+      padding: 8px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    #select-close-btn {
+      background: #3b4261;
+      color: #a9b1d6;
+    }
+
+    #select-copy-btn {
+      background: #7aa2f7;
+      color: #1a1b26;
+    }
+
+    #select-content {
+      flex: 1;
+      overflow: auto;
+      padding: 12px;
+      font-family: '"D2Coding", "Noto Sans Mono CJK KR", monospace';
+      font-size: 13px;
+      line-height: 1.4;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: #a9b1d6;
+      -webkit-user-select: text;
+      user-select: text;
+    }
   </style>
 </head>
 <body>
@@ -216,6 +275,14 @@
       <span id="session-info"></span>
     </div>
     <div id="terminal-container"></div>
+    <div id="select-overlay">
+      <div id="select-overlay-header">
+        <button id="select-close-btn">Back</button>
+        <span style="color:#a9b1d6;font-size:13px">Select &amp; Copy</span>
+        <button id="select-copy-btn">Copy All</button>
+      </div>
+      <div id="select-content"></div>
+    </div>
     <div id="text-input-bar">
       <input type="text" id="text-input" placeholder="Korean input here..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
       <button id="send-btn">Send</button>
@@ -239,6 +306,7 @@
       <button data-key="ctrl+w">C-w</button>
       <button data-key="pipe">|</button>
       <button data-key="tilde">~</button>
+      <button id="copy-btn" data-action="copy">Copy</button>
     </div>
   </div>
 
@@ -351,6 +419,59 @@
 
       term.open(document.getElementById('terminal-container'));
       fitAddon.fit();
+
+      // Clipboard helper (works on HTTP too)
+      function copyToClipboard(text) {
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(text).catch(() => fallbackCopy(text));
+        } else {
+          fallbackCopy(text);
+        }
+      }
+
+      function fallbackCopy(text) {
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.cssText = 'position:fixed;left:-9999px';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
+
+      // Select mode: show buffer as selectable text
+      function getTerminalText() {
+        const buf = term.buffer.active;
+        const lines = [];
+        for (let i = 0; i <= buf.cursorY + buf.viewportY; i++) {
+          const line = buf.getLine(i);
+          if (line) lines.push(line.translateToString(true));
+        }
+        return lines.join('\n');
+      }
+
+      document.getElementById('copy-btn').addEventListener('click', (e) => {
+        e.preventDefault();
+        const overlay = document.getElementById('select-overlay');
+        const content = document.getElementById('select-content');
+        content.textContent = getTerminalText();
+        overlay.classList.add('active');
+      });
+
+      document.getElementById('select-close-btn').addEventListener('click', () => {
+        document.getElementById('select-overlay').classList.remove('active');
+      });
+
+      document.getElementById('select-copy-btn').addEventListener('click', () => {
+        const content = document.getElementById('select-content');
+        const sel = window.getSelection();
+        const selectedText = sel && sel.toString();
+        const text = selectedText || content.textContent;
+        copyToClipboard(text);
+        const btn = document.getElementById('select-copy-btn');
+        btn.textContent = 'Copied!';
+        setTimeout(() => { btn.textContent = 'Copy All'; }, 1000);
+      });
 
       // Key input -> WebSocket
       term.onData((data) => {
