@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=resizes-content">
+  <title>Web Terminal</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #1a1b26;
+      color: #a9b1d6;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      height: 100vh;
+      height: 100dvh;
+      overflow: hidden;
+    }
+
+    /* --- Login --- */
+    #login-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 16px;
+      padding: 20px;
+    }
+
+    #login-screen h1 {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #7aa2f7;
+      margin-bottom: 8px;
+    }
+
+    #login-screen input {
+      width: 100%;
+      max-width: 320px;
+      padding: 14px 16px;
+      font-size: 16px;
+      border: 1px solid #3b4261;
+      border-radius: 8px;
+      background: #24283b;
+      color: #a9b1d6;
+      outline: none;
+    }
+
+    #login-screen input:focus {
+      border-color: #7aa2f7;
+    }
+
+    #login-screen button {
+      width: 100%;
+      max-width: 320px;
+      padding: 14px;
+      font-size: 16px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      background: #7aa2f7;
+      color: #1a1b26;
+      cursor: pointer;
+    }
+
+    #login-screen button:active {
+      background: #5d87e0;
+    }
+
+    #login-error {
+      color: #f7768e;
+      font-size: 14px;
+      min-height: 20px;
+    }
+
+    /* --- Terminal --- */
+    #terminal-screen {
+      display: none;
+      flex-direction: column;
+      height: 100%;
+    }
+
+    #status-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 4px 12px;
+      background: #24283b;
+      font-size: 12px;
+      flex-shrink: 0;
+    }
+
+    #status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #9ece6a;
+      margin-right: 6px;
+    }
+
+    #status-dot.disconnected { background: #f7768e; }
+    #status-dot.connecting { background: #e0af68; }
+
+    #terminal-container {
+      flex: 1;
+      overflow: hidden;
+    }
+
+    /* --- Key Toolbar --- */
+    #key-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      padding: 6px 8px;
+      background: #24283b;
+      border-top: 1px solid #3b4261;
+      flex-shrink: 0;
+      overflow-x: auto;
+    }
+
+    #key-toolbar button {
+      padding: 8px 12px;
+      min-width: 40px;
+      font-size: 13px;
+      font-family: monospace;
+      font-weight: 600;
+      border: 1px solid #3b4261;
+      border-radius: 6px;
+      background: #1a1b26;
+      color: #a9b1d6;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+
+    #key-toolbar button:active {
+      background: #7aa2f7;
+      color: #1a1b26;
+    }
+
+    #key-toolbar button.sticky-active {
+      background: #f7768e;
+      color: #1a1b26;
+      border-color: #f7768e;
+    }
+
+    /* --- Text Input Bar --- */
+    #text-input-bar {
+      display: flex;
+      gap: 4px;
+      padding: 6px 8px;
+      background: #24283b;
+      border-top: 1px solid #3b4261;
+      flex-shrink: 0;
+    }
+
+    #text-input-bar input {
+      flex: 1;
+      padding: 10px 12px;
+      font-size: 16px;
+      border: 1px solid #3b4261;
+      border-radius: 6px;
+      background: #1a1b26;
+      color: #a9b1d6;
+      outline: none;
+    }
+
+    #text-input-bar input:focus {
+      border-color: #7aa2f7;
+    }
+
+    #text-input-bar button {
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    #send-btn {
+      background: #7aa2f7;
+      color: #1a1b26;
+    }
+
+    #send-btn:active {
+      background: #5d87e0;
+    }
+
+    #send-raw-btn {
+      background: #3b4261;
+      color: #a9b1d6;
+    }
+
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+
+  <!-- Login -->
+  <div id="login-screen">
+    <h1>Web Terminal</h1>
+    <input type="password" id="password-input" placeholder="Password" autocomplete="current-password">
+    <button id="login-btn">Connect</button>
+    <div id="login-error"></div>
+  </div>
+
+  <!-- Terminal -->
+  <div id="terminal-screen">
+    <div id="status-bar">
+      <span><span id="status-dot"></span><span id="status-text">Connected</span></span>
+      <span id="session-info"></span>
+    </div>
+    <div id="terminal-container"></div>
+    <div id="text-input-bar">
+      <input type="text" id="text-input" placeholder="Korean input here..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+      <button id="send-btn">Send</button>
+      <button id="send-raw-btn">Raw</button>
+    </div>
+    <div id="key-toolbar">
+      <button data-sticky="ctrl">Ctrl</button>
+      <button data-key="escape">Esc</button>
+      <button data-key="tab">Tab</button>
+      <button data-key="up">&#9650;</button>
+      <button data-key="down">&#9660;</button>
+      <button data-key="left">&#9664;</button>
+      <button data-key="right">&#9654;</button>
+      <button data-key="ctrl+c">C-c</button>
+      <button data-key="ctrl+d">C-d</button>
+      <button data-key="ctrl+z">C-z</button>
+      <button data-key="ctrl+l">C-l</button>
+      <button data-key="ctrl+a">C-a</button>
+      <button data-key="ctrl+e">C-e</button>
+      <button data-key="ctrl+r">C-r</button>
+      <button data-key="ctrl+w">C-w</button>
+      <button data-key="pipe">|</button>
+      <button data-key="tilde">~</button>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-web-links@0.9.0/lib/xterm-addon-web-links.js"></script>
+  <script>
+    const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+
+    // --- Login ---
+    const loginScreen = document.getElementById('login-screen');
+    const terminalScreen = document.getElementById('terminal-screen');
+    const passwordInput = document.getElementById('password-input');
+    const loginBtn = document.getElementById('login-btn');
+    const loginError = document.getElementById('login-error');
+    const statusDot = document.getElementById('status-dot');
+    const statusText = document.getElementById('status-text');
+
+    let authToken = sessionStorage.getItem('terminal_token');
+
+    if (authToken) {
+      showTerminal();
+    } else {
+      passwordInput.focus();
+    }
+
+    loginBtn.addEventListener('click', doLogin);
+    passwordInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') doLogin();
+    });
+
+    async function doLogin() {
+      loginError.textContent = '';
+      loginBtn.disabled = true;
+      try {
+        const res = await fetch('/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ password: passwordInput.value }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          loginError.textContent = data.error || 'Login failed';
+          return;
+        }
+        authToken = data.token;
+        sessionStorage.setItem('terminal_token', authToken);
+        showTerminal();
+      } catch (err) {
+        loginError.textContent = 'Connection error';
+      } finally {
+        loginBtn.disabled = false;
+      }
+    }
+
+    // --- Terminal ---
+    let term, fitAddon, ws;
+    let reconnectTimer = null;
+    let reconnectDelay = 1000;
+
+    function showTerminal() {
+      loginScreen.classList.add('hidden');
+      terminalScreen.style.display = 'flex';
+      initTerminal();
+      connectWS();
+    }
+
+    function sendInput(data) {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'input', data }));
+      }
+    }
+
+    function initTerminal() {
+      if (term) return;
+
+      term = new Terminal({
+        cursorBlink: true,
+        fontSize: isMobile ? 13 : 15,
+        fontFamily: '"D2Coding", "Noto Sans Mono CJK KR", "Cascadia Code", "Fira Code", monospace',
+        theme: {
+          background: '#1a1b26',
+          foreground: '#a9b1d6',
+          cursor: '#c0caf5',
+          selectionBackground: '#33467c',
+          black: '#15161e',
+          red: '#f7768e',
+          green: '#9ece6a',
+          yellow: '#e0af68',
+          blue: '#7aa2f7',
+          magenta: '#bb9af7',
+          cyan: '#7dcfff',
+          white: '#a9b1d6',
+          brightBlack: '#414868',
+          brightRed: '#f7768e',
+          brightGreen: '#9ece6a',
+          brightYellow: '#e0af68',
+          brightBlue: '#7aa2f7',
+          brightMagenta: '#bb9af7',
+          brightCyan: '#7dcfff',
+          brightWhite: '#c0caf5',
+        },
+        scrollback: 5000,
+        allowProposedApi: true,
+      });
+
+      fitAddon = new FitAddon.FitAddon();
+      term.loadAddon(fitAddon);
+      term.loadAddon(new WebLinksAddon.WebLinksAddon());
+
+      term.open(document.getElementById('terminal-container'));
+      fitAddon.fit();
+
+      // Key input -> WebSocket
+      term.onData((data) => {
+        // If Ctrl sticky is active, convert to control char
+        if (ctrlSticky && data.length === 1) {
+          const code = data.toLowerCase().charCodeAt(0);
+          if (code >= 97 && code <= 122) { // a-z
+            data = String.fromCharCode(code - 96);
+          }
+          setCtrlSticky(false);
+        }
+        sendInput(data);
+      });
+
+      // Resize -> WebSocket
+      term.onResize(({ cols, rows }) => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'resize', cols, rows }));
+        }
+      });
+
+      // Window resize -> fit
+      window.addEventListener('resize', handleResize);
+
+      // Mobile: visualViewport for keyboard
+      if (window.visualViewport) {
+        window.visualViewport.addEventListener('resize', handleResize);
+      }
+
+      // Mobile: tap to focus keyboard
+      if (isMobile) {
+        document.getElementById('terminal-container').addEventListener('touchstart', () => {
+          const textarea = document.querySelector('.xterm-helper-textarea');
+          if (textarea) textarea.focus({ preventScroll: true });
+        });
+      }
+
+      initKeyToolbar();
+      initTextInput();
+    }
+
+    function handleResize() {
+      if (!fitAddon) return;
+      const container = document.getElementById('terminal-container');
+      if (window.visualViewport) {
+        const statusBar = document.getElementById('status-bar');
+        const toolbar = document.getElementById('key-toolbar');
+        const textBar = document.getElementById('text-input-bar');
+        const used = statusBar.offsetHeight + toolbar.offsetHeight + textBar.offsetHeight;
+        container.style.height = (window.visualViewport.height - used) + 'px';
+      }
+      fitAddon.fit();
+    }
+
+    // --- Text Input Bar ---
+    function initTextInput() {
+      const input = document.getElementById('text-input');
+      const sendBtn = document.getElementById('send-btn');
+      const sendRawBtn = document.getElementById('send-raw-btn');
+
+      // Send: text + Enter
+      sendBtn.addEventListener('click', () => {
+        if (input.value) {
+          sendInput(input.value + '\r');
+          input.value = '';
+        }
+        input.focus();
+      });
+
+      // Raw: text only (no Enter)
+      sendRawBtn.addEventListener('click', () => {
+        if (input.value) {
+          sendInput(input.value);
+          input.value = '';
+        }
+        input.focus();
+      });
+
+      // Enter key in input field = send
+      input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.isComposing) {
+          e.preventDefault();
+          sendBtn.click();
+        }
+      });
+    }
+
+    // --- Key Toolbar ---
+    let ctrlSticky = false;
+
+    function setCtrlSticky(active) {
+      ctrlSticky = active;
+      const btn = document.querySelector('[data-sticky="ctrl"]');
+      if (btn) btn.classList.toggle('sticky-active', active);
+    }
+
+    const KEY_MAP = {
+      'escape':  '\x1b',
+      'tab':     '\t',
+      'up':      '\x1b[A',
+      'down':    '\x1b[B',
+      'right':   '\x1b[C',
+      'left':    '\x1b[D',
+      'ctrl+c':  '\x03',
+      'ctrl+d':  '\x04',
+      'ctrl+z':  '\x1a',
+      'ctrl+l':  '\x0c',
+      'ctrl+a':  '\x01',
+      'ctrl+e':  '\x05',
+      'ctrl+r':  '\x12',
+      'ctrl+w':  '\x17',
+      'pipe':    '|',
+      'tilde':   '~',
+    };
+
+    function initKeyToolbar() {
+      const toolbar = document.getElementById('key-toolbar');
+
+      function handleBtn(btn) {
+        if (!btn) return;
+
+        // Sticky Ctrl
+        if (btn.dataset.sticky === 'ctrl') {
+          setCtrlSticky(!ctrlSticky);
+          refocusTerminal();
+          return;
+        }
+
+        const key = btn.dataset.key;
+        if (key && KEY_MAP[key]) {
+          sendInput(KEY_MAP[key]);
+          if (ctrlSticky) setCtrlSticky(false);
+        }
+
+        refocusTerminal();
+      }
+
+      function refocusTerminal() {
+        setTimeout(() => {
+          const textarea = document.querySelector('.xterm-helper-textarea');
+          if (textarea) textarea.focus({ preventScroll: true });
+        }, 50);
+      }
+
+      // Prevent focus steal from terminal (desktop)
+      toolbar.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        handleBtn(e.target.closest('button'));
+      });
+
+      // Mobile: handle on touchend
+      toolbar.addEventListener('touchstart', (e) => {
+        if (e.target.closest('button')) e.preventDefault();
+      }, { passive: false });
+
+      toolbar.addEventListener('touchend', (e) => {
+        e.preventDefault();
+        handleBtn(e.target.closest('button'));
+      }, { passive: false });
+    }
+
+    // --- WebSocket ---
+    function connectWS() {
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+
+      setStatus('connecting', 'Connecting...');
+
+      const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${location.host}/ws?token=${encodeURIComponent(authToken)}`);
+
+      ws.onopen = () => {
+        setStatus('connected', 'Connected');
+        reconnectDelay = 1000;
+        // Send initial size
+        if (term) {
+          ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+        }
+      };
+
+      ws.onmessage = (event) => {
+        try {
+          const msg = JSON.parse(event.data);
+          if (msg.type === 'output') {
+            term.write(msg.data);
+          } else if (msg.type === 'exit') {
+            term.write('\r\n\x1b[33m[Session ended]\x1b[0m\r\n');
+            setStatus('disconnected', 'Session ended');
+          } else if (msg.type === 'error') {
+            term.write(`\r\n\x1b[31m[Error: ${msg.data}]\x1b[0m\r\n`);
+          }
+        } catch { /* ignore */ }
+      };
+
+      ws.onclose = (event) => {
+        if (event.code === 4001 || event.reason === 'Unauthorized') {
+          sessionStorage.removeItem('terminal_token');
+          authToken = null;
+          terminalScreen.style.display = 'none';
+          loginScreen.classList.remove('hidden');
+          loginError.textContent = 'Session expired. Please login again.';
+          passwordInput.focus();
+          return;
+        }
+
+        setStatus('disconnected', 'Disconnected');
+        term.write('\r\n\x1b[31m[Disconnected. Reconnecting...]\x1b[0m\r\n');
+        reconnectTimer = setTimeout(() => {
+          reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+          connectWS();
+        }, reconnectDelay);
+      };
+
+      ws.onerror = () => {};
+    }
+
+    function setStatus(state, text) {
+      statusDot.className = state === 'connected' ? '' : state;
+      statusText.textContent = text;
+    }
+  </script>
+</body>
+</html>
