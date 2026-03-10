@@ -1226,6 +1226,7 @@
       }
 
       function refocusTerminal() {
+        if (isMobile) return; // Don't steal focus on mobile (prevents keyboard popup)
         setTimeout(() => {
           const textarea = document.querySelector('.xterm-helper-textarea');
           if (textarea) textarea.focus({ preventScroll: true });
