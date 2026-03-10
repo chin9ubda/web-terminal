@@ -432,6 +432,306 @@
       color: #a9b1d6;
     }
 
+    /* --- File Browser Overlay --- */
+    #file-browser {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #1a1b26;
+      z-index: 20;
+      flex-direction: column;
+    }
+
+    #file-browser.active {
+      display: flex;
+    }
+
+    #fb-header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #24283b;
+      border-bottom: 1px solid #3b4261;
+      flex-shrink: 0;
+    }
+
+    #fb-back-btn, #fb-close-btn {
+      padding: 6px 12px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #3b4261;
+      color: #a9b1d6;
+      touch-action: manipulation;
+    }
+
+    #fb-path {
+      flex: 1;
+      font-family: monospace;
+      font-size: 13px;
+      color: #7aa2f7;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+
+    #fb-upload-btn {
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #9ece6a;
+      color: #1a1b26;
+      touch-action: manipulation;
+    }
+
+    #fb-list {
+      flex: 1;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      padding: 4px 0;
+    }
+
+    .fb-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      border-bottom: 1px solid #292e42;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+
+    .fb-item:active {
+      background: #292e42;
+    }
+
+    .fb-item .fb-icon {
+      font-size: 18px;
+      width: 28px;
+      text-align: center;
+      flex-shrink: 0;
+    }
+
+    .fb-item .fb-name {
+      flex: 1;
+      font-size: 14px;
+      color: #c0caf5;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      min-width: 0;
+    }
+
+    .fb-item .fb-name.dir {
+      color: #7aa2f7;
+      font-weight: 600;
+    }
+
+    .fb-item .fb-meta {
+      font-size: 11px;
+      color: #565f89;
+      text-align: right;
+      flex-shrink: 0;
+      white-space: nowrap;
+    }
+
+    #fb-empty {
+      padding: 40px 20px;
+      text-align: center;
+      color: #565f89;
+      font-size: 14px;
+    }
+
+    #fb-loading {
+      padding: 40px 20px;
+      text-align: center;
+      color: #565f89;
+      font-size: 14px;
+    }
+
+    #fb-error {
+      padding: 12px 14px;
+      color: #f7768e;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    /* File action sheet (bottom sheet) */
+    #file-actions {
+      display: none;
+      position: fixed;
+      bottom: 0; left: 0; right: 0;
+      background: #24283b;
+      border-top: 1px solid #3b4261;
+      border-radius: 16px 16px 0 0;
+      z-index: 30;
+      padding: 16px 12px;
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
+    }
+
+    #file-actions.active {
+      display: block;
+    }
+
+    #file-actions-backdrop {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      z-index: 25;
+    }
+
+    #file-actions-backdrop.active {
+      display: block;
+    }
+
+    #file-actions-title {
+      font-size: 14px;
+      color: #565f89;
+      text-align: center;
+      margin-bottom: 12px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .fa-btn {
+      display: block;
+      width: 100%;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      text-align: center;
+      margin-bottom: 6px;
+      background: #1a1b26;
+      color: #a9b1d6;
+      touch-action: manipulation;
+    }
+
+    .fa-btn:active {
+      background: #292e42;
+    }
+
+    .fa-btn.danger {
+      color: #f7768e;
+    }
+
+    #fa-cancel-btn {
+      margin-top: 6px;
+      background: #3b4261;
+    }
+
+    /* New folder / rename dialog */
+    #fb-dialog {
+      display: none;
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 35;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    #fb-dialog.active {
+      display: flex;
+    }
+
+    #fb-dialog-box {
+      background: #24283b;
+      border: 1px solid #3b4261;
+      border-radius: 12px;
+      padding: 20px;
+      width: 100%;
+      max-width: 340px;
+    }
+
+    #fb-dialog-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #c0caf5;
+      margin-bottom: 12px;
+    }
+
+    #fb-dialog-input {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 15px;
+      border: 1px solid #3b4261;
+      border-radius: 8px;
+      background: #1a1b26;
+      color: #a9b1d6;
+      outline: none;
+      margin-bottom: 12px;
+    }
+
+    #fb-dialog-input:focus {
+      border-color: #7aa2f7;
+    }
+
+    #fb-dialog-btns {
+      display: flex;
+      gap: 8px;
+    }
+
+    #fb-dialog-btns button {
+      flex: 1;
+      padding: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    #fbd-cancel {
+      background: #3b4261;
+      color: #a9b1d6;
+    }
+
+    #fbd-ok {
+      background: #7aa2f7;
+      color: #1a1b26;
+    }
+
+    #fb-footer {
+      display: flex;
+      gap: 8px;
+      padding: 8px 12px;
+      background: #24283b;
+      border-top: 1px solid #3b4261;
+      flex-shrink: 0;
+    }
+
+    #fb-footer button {
+      flex: 1;
+      padding: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      background: #1a1b26;
+      color: #a9b1d6;
+      border: 1px solid #3b4261;
+      touch-action: manipulation;
+    }
+
+    #fb-footer button:active {
+      background: #7aa2f7;
+      color: #1a1b26;
+    }
+
     .hidden { display: none !important; }
 
     /* --- Scroll Overlay --- */
@@ -615,6 +915,7 @@
       <span><span id="status-dot"></span><span id="status-text">Connected</span></span>
       <span>
         <span id="session-info"></span>
+        <button id="files-btn" style="padding:2px 8px;font-size:11px;font-weight:600;border:1px solid #3b4261;border-radius:4px;background:none;color:#9ece6a;cursor:pointer;margin-left:8px">Files</button>
         <button id="disconnect-btn">Disconnect</button>
       </span>
     </div>
@@ -659,6 +960,46 @@
       <button data-cmd="tmux new -As main">tmux</button>
       <button data-cmd="claude">cc</button>
       <button data-cmd="claude --resume">ccr</button>
+    </div>
+  </div>
+
+  <!-- File Browser Overlay -->
+  <div id="file-browser">
+    <div id="fb-header">
+      <button id="fb-back-btn">&larr;</button>
+      <div id="fb-path">/</div>
+      <button id="fb-upload-btn">Upload</button>
+      <button id="fb-close-btn">&times;</button>
+    </div>
+    <div id="fb-error"></div>
+    <div id="fb-loading">Loading...</div>
+    <div id="fb-list"></div>
+    <div id="fb-empty" style="display:none">Empty directory</div>
+    <div id="fb-footer">
+      <button id="fb-newfolder-btn">New Folder</button>
+    </div>
+    <input type="file" id="fb-file-input" style="display:none" multiple>
+  </div>
+
+  <!-- File Action Sheet -->
+  <div id="file-actions-backdrop"></div>
+  <div id="file-actions">
+    <div id="file-actions-title"></div>
+    <button class="fa-btn" id="fa-download-btn">Download</button>
+    <button class="fa-btn" id="fa-rename-btn">Rename</button>
+    <button class="fa-btn danger" id="fa-delete-btn">Delete</button>
+    <button class="fa-btn" id="fa-cancel-btn">Cancel</button>
+  </div>
+
+  <!-- Dialog (new folder / rename) -->
+  <div id="fb-dialog">
+    <div id="fb-dialog-box">
+      <div id="fb-dialog-title"></div>
+      <input type="text" id="fb-dialog-input" autocomplete="off">
+      <div id="fb-dialog-btns">
+        <button id="fbd-cancel">Cancel</button>
+        <button id="fbd-ok">OK</button>
+      </div>
     </div>
   </div>
 
@@ -1276,6 +1617,7 @@
           const msg = JSON.parse(event.data);
           if (msg.type === 'connected') {
             setStatus('connected', 'Connected');
+            if (msg.session_id) currentSessionId = msg.session_id;
             if (term) term.focus();
           } else if (msg.type === 'output') {
             term.write(msg.data);
@@ -1332,6 +1674,291 @@
       statusDot.className = state === 'connected' ? '' : state;
       statusText.textContent = text;
     }
+
+    // --- File Browser ---
+    let currentSessionId = null;
+
+    const fileBrowser = {
+      el: document.getElementById('file-browser'),
+      listEl: document.getElementById('fb-list'),
+      pathEl: document.getElementById('fb-path'),
+      errorEl: document.getElementById('fb-error'),
+      loadingEl: document.getElementById('fb-loading'),
+      emptyEl: document.getElementById('fb-empty'),
+      currentPath: '/',
+      history: [],
+      selectedFile: null,
+
+      open() {
+        if (!currentSessionId) return;
+        this.history = [];
+        this.currentPath = '/';
+        this.el.classList.add('active');
+        this.load('');
+      },
+
+      close() {
+        this.el.classList.remove('active');
+      },
+
+      async load(path) {
+        this.errorEl.textContent = '';
+        this.loadingEl.style.display = 'block';
+        this.listEl.innerHTML = '';
+        this.emptyEl.style.display = 'none';
+        try {
+          const params = new URLSearchParams({ session_id: currentSessionId });
+          if (path) params.set('path', path);
+          const res = await fetch(`/api/files?${params}`, {
+            headers: { 'Authorization': `Bearer ${authToken}` },
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.error || 'Load failed');
+          this.currentPath = data.path;
+          this.pathEl.textContent = data.path;
+          this.renderList(data.entries);
+        } catch (e) {
+          this.errorEl.textContent = e.message;
+        } finally {
+          this.loadingEl.style.display = 'none';
+        }
+      },
+
+      renderList(entries) {
+        this.listEl.innerHTML = '';
+        if (entries.length === 0) {
+          this.emptyEl.style.display = 'block';
+          return;
+        }
+        entries.forEach((entry) => {
+          const item = document.createElement('div');
+          item.className = 'fb-item';
+          const icon = entry.type === 'dir' ? '\uD83D\uDCC1' : '\uD83D\uDCC4';
+          const nameClass = entry.type === 'dir' ? 'fb-name dir' : 'fb-name';
+          const dateStr = entry.mtime ? new Date(entry.mtime * 1000).toLocaleDateString() : '';
+          item.innerHTML = `
+            <span class="fb-icon">${icon}</span>
+            <span class="${nameClass}">${escapeHtml(entry.name)}</span>
+            <span class="fb-meta">${entry.type === 'dir' ? '' : entry.size_h + '  '}${dateStr}</span>
+          `;
+          item.addEventListener('click', () => {
+            if (entry.type === 'dir') {
+              this.history.push(this.currentPath);
+              this.load(this.currentPath.replace(/\/$/, '') + '/' + entry.name);
+            } else {
+              this.showActions(entry);
+            }
+          });
+          this.listEl.appendChild(item);
+        });
+      },
+
+      goBack() {
+        if (this.history.length > 0) {
+          this.load(this.history.pop());
+        } else {
+          // Go to parent directory
+          const parent = this.currentPath.replace(/\/[^/]+\/?$/, '') || '/';
+          if (parent !== this.currentPath) {
+            this.load(parent);
+          }
+        }
+      },
+
+      showActions(entry) {
+        this.selectedFile = entry;
+        document.getElementById('file-actions-title').textContent =
+          `${entry.name} (${entry.size_h})`;
+        document.getElementById('file-actions').classList.add('active');
+        document.getElementById('file-actions-backdrop').classList.add('active');
+      },
+
+      hideActions() {
+        document.getElementById('file-actions').classList.remove('active');
+        document.getElementById('file-actions-backdrop').classList.remove('active');
+        this.selectedFile = null;
+      },
+
+      async download() {
+        if (!this.selectedFile) return;
+        const path = this.currentPath.replace(/\/$/, '') + '/' + this.selectedFile.name;
+        this.hideActions();
+        try {
+          const params = new URLSearchParams({ session_id: currentSessionId, path });
+          const res = await fetch(`/api/files/download?${params}`, {
+            headers: { 'Authorization': `Bearer ${authToken}` },
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Download failed');
+          }
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = this.selectedFile.name;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          URL.revokeObjectURL(url);
+        } catch (e) {
+          this.errorEl.textContent = e.message;
+        }
+      },
+
+      async doDelete() {
+        if (!this.selectedFile) return;
+        const name = this.selectedFile.name;
+        if (!confirm(`Delete "${name}"?`)) {
+          this.hideActions();
+          return;
+        }
+        const path = this.currentPath.replace(/\/$/, '') + '/' + name;
+        this.hideActions();
+        try {
+          const params = new URLSearchParams({ session_id: currentSessionId, path });
+          const res = await fetch(`/api/files?${params}`, {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${authToken}` },
+          });
+          if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Delete failed');
+          }
+          this.load(this.currentPath);
+        } catch (e) {
+          this.errorEl.textContent = e.message;
+        }
+      },
+
+      showDialog(title, defaultValue, callback) {
+        const dialog = document.getElementById('fb-dialog');
+        const input = document.getElementById('fb-dialog-input');
+        document.getElementById('fb-dialog-title').textContent = title;
+        input.value = defaultValue;
+        dialog.classList.add('active');
+        input.focus();
+        input.select();
+
+        const cleanup = () => {
+          dialog.classList.remove('active');
+          okBtn.removeEventListener('click', onOk);
+          cancelBtn.removeEventListener('click', onCancel);
+          input.removeEventListener('keydown', onKey);
+        };
+        const onOk = () => { cleanup(); callback(input.value.trim()); };
+        const onCancel = () => { cleanup(); };
+        const onKey = (e) => { if (e.key === 'Enter') onOk(); if (e.key === 'Escape') onCancel(); };
+
+        const okBtn = document.getElementById('fbd-ok');
+        const cancelBtn = document.getElementById('fbd-cancel');
+        okBtn.addEventListener('click', onOk);
+        cancelBtn.addEventListener('click', onCancel);
+        input.addEventListener('keydown', onKey);
+      },
+
+      async doRename() {
+        if (!this.selectedFile) return;
+        const oldName = this.selectedFile.name;
+        this.hideActions();
+        this.showDialog('Rename', oldName, async (newName) => {
+          if (!newName || newName === oldName) return;
+          const base = this.currentPath.replace(/\/$/, '');
+          try {
+            const renameParams = new URLSearchParams({ session_id: currentSessionId });
+            const res = await fetch(`/api/files/rename?${renameParams}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`,
+              },
+              body: JSON.stringify({
+                old_path: base + '/' + oldName,
+                new_path: base + '/' + newName,
+              }),
+            });
+            if (!res.ok) {
+              const err = await res.json();
+              throw new Error(err.error || 'Rename failed');
+            }
+            this.load(this.currentPath);
+          } catch (e) {
+            this.errorEl.textContent = e.message;
+          }
+        });
+      },
+
+      newFolder() {
+        this.showDialog('New Folder', '', async (name) => {
+          if (!name) return;
+          const path = this.currentPath.replace(/\/$/, '') + '/' + name;
+          try {
+            const mkdirParams = new URLSearchParams({ session_id: currentSessionId });
+            const res = await fetch(`/api/files/mkdir?${mkdirParams}`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${authToken}`,
+              },
+              body: JSON.stringify({ path }),
+            });
+            if (!res.ok) {
+              const err = await res.json();
+              throw new Error(err.error || 'Mkdir failed');
+            }
+            this.load(this.currentPath);
+          } catch (e) {
+            this.errorEl.textContent = e.message;
+          }
+        });
+      },
+
+      async uploadFiles(files) {
+        for (const file of files) {
+          try {
+            const form = new FormData();
+            form.append('file', file);
+            const params = new URLSearchParams({
+              session_id: currentSessionId,
+              path: this.currentPath,
+            });
+            const res = await fetch(`/api/files/upload?${params}`, {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${authToken}` },
+              body: form,
+            });
+            if (!res.ok) {
+              const err = await res.json();
+              throw new Error(err.error || 'Upload failed');
+            }
+          } catch (e) {
+            this.errorEl.textContent = `Upload "${file.name}": ${e.message}`;
+            return;
+          }
+        }
+        this.load(this.currentPath);
+      },
+    };
+
+    // File browser event bindings
+    document.getElementById('files-btn').addEventListener('click', () => fileBrowser.open());
+    document.getElementById('fb-close-btn').addEventListener('click', () => fileBrowser.close());
+    document.getElementById('fb-back-btn').addEventListener('click', () => fileBrowser.goBack());
+    document.getElementById('fb-upload-btn').addEventListener('click', () => {
+      document.getElementById('fb-file-input').click();
+    });
+    document.getElementById('fb-file-input').addEventListener('change', (e) => {
+      if (e.target.files.length > 0) {
+        fileBrowser.uploadFiles(e.target.files);
+        e.target.value = '';
+      }
+    });
+    document.getElementById('fb-newfolder-btn').addEventListener('click', () => fileBrowser.newFolder());
+    document.getElementById('fa-download-btn').addEventListener('click', () => fileBrowser.download());
+    document.getElementById('fa-rename-btn').addEventListener('click', () => fileBrowser.doRename());
+    document.getElementById('fa-delete-btn').addEventListener('click', () => fileBrowser.doDelete());
+    document.getElementById('fa-cancel-btn').addEventListener('click', () => fileBrowser.hideActions());
+    document.getElementById('file-actions-backdrop').addEventListener('click', () => fileBrowser.hideActions());
   </script>
 </body>
 </html>

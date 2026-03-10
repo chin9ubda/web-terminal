@@ -16,6 +16,8 @@ from pathlib import Path
 import asyncssh
 from aiohttp import web
 
+from file_manager import FileManager, LocalFileManager, SFTPFileManager
+
 logging.basicConfig(level=logging.INFO, format='%(message)s')
 log = logging.getLogger('wt')
 
@@ -35,6 +37,8 @@ PASSWORD = os.environ.get('TERMINAL_PASSWORD', '')
 PORT = int(os.environ.get('PORT', '3456'))
 SHELL = os.environ.get('SHELL_PATH', '/bin/bash')
 MAX_SESSIONS = int(os.environ.get('MAX_SESSIONS', '5'))
+UPLOAD_MAX_SIZE = int(os.environ.get('UPLOAD_MAX_SIZE', str(100 * 1024 * 1024)))  # 100MB
+SFTP_LOCAL_ROOT = os.environ.get('SFTP_LOCAL_ROOT', '') or None
 HOSTS_FILE = Path(__file__).parent / 'hosts.json'
 
 if not PASSWORD:
@@ -165,6 +169,179 @@ async def delete_host(request: web.Request) -> web.Response:
         return web.json_response({'error': 'Not found'}, status=404)
     save_hosts(new_hosts)
     return web.json_response({'ok': True})
+
+
+# --- Session Registry (for SFTP file API) ---
+# session_id -> { 'mode': 'local'|'ssh', 'conn': SSHClientConnection|None, 'fm': FileManager|None }
+active_sessions: dict[str, dict] = {}
+
+
+def _get_fm(request: web.Request) -> tuple[FileManager | None, str]:
+    """Get FileManager for a session. Returns (fm, error_msg)."""
+    sid = request.query.get('session_id', '') or request.match_info.get('session_id', '')
+    if not sid or sid not in active_sessions:
+        return None, 'Invalid session'
+    sess = active_sessions[sid]
+    fm = sess.get('fm')
+    if fm is None:
+        return None, 'File manager not available'
+    return fm, ''
+
+
+@routes.get('/api/files')
+async def files_list(request: web.Request) -> web.Response:
+    if not _check_token(request):
+        return web.json_response({'error': 'Unauthorized'}, status=401)
+    fm, err = _get_fm(request)
+    if fm is None:
+        return web.json_response({'error': err}, status=400)
+    path = request.query.get('path', '')
+    if not path:
+        path = await fm.get_home()
+    try:
+        entries = await fm.list_dir(path)
+        return web.json_response({'path': path, 'entries': entries})
+    except PermissionError as e:
+        return web.json_response({'error': str(e)}, status=403)
+    except FileNotFoundError:
+        return web.json_response({'error': 'Path not found'}, status=404)
+    except Exception as e:
+        return web.json_response({'error': f'List failed: {e}'}, status=500)
+
+
+@routes.get('/api/files/download')
+async def files_download(request: web.Request) -> web.Response:
+    if not _check_token(request):
+        return web.json_response({'error': 'Unauthorized'}, status=401)
+    fm, err = _get_fm(request)
+    if fm is None:
+        return web.json_response({'error': err}, status=400)
+    path = request.query.get('path', '')
+    if not path:
+        return web.json_response({'error': 'path required'}, status=400)
+    try:
+        data = await fm.read_file(path)
+        filename = path.rstrip('/').rsplit('/', 1)[-1] or 'download'
+        return web.Response(
+            body=data,
+            content_type='application/octet-stream',
+            headers={'Content-Disposition': f'attachment; filename="{filename}"'},
+        )
+    except PermissionError as e:
+        return web.json_response({'error': str(e)}, status=403)
+    except FileNotFoundError:
+        return web.json_response({'error': 'File not found'}, status=404)
+    except Exception as e:
+        return web.json_response({'error': f'Download failed: {e}'}, status=500)
+
+
+@routes.post('/api/files/upload')
+async def files_upload(request: web.Request) -> web.Response:
+    if not _check_token(request):
+        return web.json_response({'error': 'Unauthorized'}, status=401)
+    fm, err = _get_fm(request)
+    if fm is None:
+        return web.json_response({'error': err}, status=400)
+    dest_dir = request.query.get('path', '')
+    if not dest_dir:
+        return web.json_response({'error': 'path required'}, status=400)
+    try:
+        reader = await request.multipart()
+        field = await reader.next()
+        if field is None or field.name != 'file':
+            return web.json_response({'error': 'No file field'}, status=400)
+        filename = field.filename or 'upload'
+        # Read with size limit
+        chunks = []
+        total = 0
+        while True:
+            chunk = await field.read_chunk(65536)
+            if not chunk:
+                break
+            total += len(chunk)
+            if total > UPLOAD_MAX_SIZE:
+                return web.json_response({'error': f'File too large (max {UPLOAD_MAX_SIZE // (1024*1024)}MB)'}, status=413)
+            chunks.append(chunk)
+        data = b''.join(chunks)
+        dest_path = dest_dir.rstrip('/') + '/' + filename
+        await fm.write_file(dest_path, data)
+        return web.json_response({'ok': True, 'name': filename, 'size': len(data)})
+    except PermissionError as e:
+        return web.json_response({'error': str(e)}, status=403)
+    except Exception as e:
+        return web.json_response({'error': f'Upload failed: {e}'}, status=500)
+
+
+@routes.delete('/api/files')
+async def files_delete(request: web.Request) -> web.Response:
+    if not _check_token(request):
+        return web.json_response({'error': 'Unauthorized'}, status=401)
+    fm, err = _get_fm(request)
+    if fm is None:
+        return web.json_response({'error': err}, status=400)
+    path = request.query.get('path', '')
+    if not path:
+        return web.json_response({'error': 'path required'}, status=400)
+    try:
+        await fm.delete(path)
+        return web.json_response({'ok': True})
+    except PermissionError as e:
+        return web.json_response({'error': str(e)}, status=403)
+    except FileNotFoundError:
+        return web.json_response({'error': 'Not found'}, status=404)
+    except OSError as e:
+        return web.json_response({'error': f'Delete failed: {e}'}, status=500)
+
+
+@routes.post('/api/files/mkdir')
+async def files_mkdir(request: web.Request) -> web.Response:
+    if not _check_token(request):
+        return web.json_response({'error': 'Unauthorized'}, status=401)
+    fm, err = _get_fm(request)
+    if fm is None:
+        return web.json_response({'error': err}, status=400)
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({'error': 'Invalid request'}, status=400)
+    path = body.get('path', '')
+    if not path:
+        return web.json_response({'error': 'path required'}, status=400)
+    try:
+        await fm.mkdir(path)
+        return web.json_response({'ok': True})
+    except PermissionError as e:
+        return web.json_response({'error': str(e)}, status=403)
+    except FileExistsError:
+        return web.json_response({'error': 'Already exists'}, status=409)
+    except Exception as e:
+        return web.json_response({'error': f'Mkdir failed: {e}'}, status=500)
+
+
+@routes.post('/api/files/rename')
+async def files_rename(request: web.Request) -> web.Response:
+    if not _check_token(request):
+        return web.json_response({'error': 'Unauthorized'}, status=401)
+    fm, err = _get_fm(request)
+    if fm is None:
+        return web.json_response({'error': err}, status=400)
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({'error': 'Invalid request'}, status=400)
+    old_path = body.get('old_path', '')
+    new_path = body.get('new_path', '')
+    if not old_path or not new_path:
+        return web.json_response({'error': 'old_path and new_path required'}, status=400)
+    try:
+        await fm.rename(old_path, new_path)
+        return web.json_response({'ok': True})
+    except PermissionError as e:
+        return web.json_response({'error': str(e)}, status=403)
+    except FileNotFoundError:
+        return web.json_response({'error': 'Not found'}, status=404)
+    except Exception as e:
+        return web.json_response({'error': f'Rename failed: {e}'}, status=500)
 
 
 # --- PTY Session (Local) ---
@@ -381,6 +558,7 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     # Wait for connect message to determine session type
     session = None
     read_task = None
+    session_id = secrets.token_urlsafe(16)
 
     try:
         # First message should be a connect request
@@ -413,20 +591,38 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
                 await ws.close(code=4004, message=b'SSH connection failed')
                 return ws
 
+            # Start SFTP client for file browsing
+            sftp_client = None
+            try:
+                sftp_client = await ssh_session.conn.start_sftp_client()
+            except Exception:
+                log.warning('SFTP subsystem not available on remote host')
+
+            fm = SFTPFileManager(sftp_client) if sftp_client else None
+            active_sessions[session_id] = {'mode': 'ssh', 'conn': ssh_session.conn, 'fm': fm}
+
             session = ssh_session
             active_session_count += 1
             label = f"{connect_data.get('username')}@{connect_data.get('host')}"
             log.info(f'SSH opened ({label}, active: {active_session_count})')
-            await ws.send_json({'type': 'connected', 'mode': 'ssh', 'host': connect_data.get('host', '')})
+            await ws.send_json({
+                'type': 'connected', 'mode': 'ssh',
+                'host': connect_data.get('host', ''),
+                'session_id': session_id,
+            })
 
         elif mode == 'connect_local':
             # Local PTY session
             pty_session = PtySession(ws)
             pty_session.spawn()
+
+            fm = LocalFileManager(root=SFTP_LOCAL_ROOT)
+            active_sessions[session_id] = {'mode': 'local', 'conn': None, 'fm': fm}
+
             session = pty_session
             active_session_count += 1
             log.info(f'PTY opened (pid: {pty_session.pid}, active: {active_session_count})')
-            await ws.send_json({'type': 'connected', 'mode': 'local'})
+            await ws.send_json({'type': 'connected', 'mode': 'local', 'session_id': session_id})
 
         else:
             await ws.close(code=4003, message=b'Invalid connect type')
@@ -467,6 +663,7 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
                     await read_task
                 except asyncio.CancelledError:
                     pass
+            active_sessions.pop(session_id, None)
             active_session_count -= 1
             log.info(f'Session closed (active: {active_session_count})')
 
