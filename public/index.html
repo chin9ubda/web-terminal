@@ -638,6 +638,7 @@
       <button data-sticky="ctrl">Ctrl</button>
       <button data-key="escape">Esc</button>
       <button data-key="tab">Tab</button>
+      <button data-key="enter">Enter</button>
       <button data-key="up">&#9650;</button>
       <button data-key="down">&#9660;</button>
       <button data-key="left">&#9664;</button>
@@ -1167,6 +1168,7 @@
     const KEY_MAP = {
       'escape':  '\x1b',
       'tab':     '\t',
+      'enter':   '\r',
       'up':      '\x1b[A',
       'down':    '\x1b[B',
       'right':   '\x1b[C',
@@ -1205,14 +1207,12 @@
         // Sticky Ctrl
         if (btn.dataset.sticky === 'ctrl') {
           setCtrlSticky(!ctrlSticky);
-          refocusTerminal();
           return;
         }
 
         // Command shortcut
         if (btn.dataset.cmd) {
           sendInput(btn.dataset.cmd + '\r');
-          refocusTerminal();
           return;
         }
 
@@ -1222,32 +1222,28 @@
           if (ctrlSticky) setCtrlSticky(false);
         }
 
-        refocusTerminal();
+        // Blur any focused element to prevent keyboard popup on touch devices
+        if (document.activeElement) document.activeElement.blur();
       }
 
-      function refocusTerminal() {
-        if (isMobile) return; // Don't steal focus on mobile (prevents keyboard popup)
-        setTimeout(() => {
-          const textarea = document.querySelector('.xterm-helper-textarea');
-          if (textarea) textarea.focus({ preventScroll: true });
-        }, 50);
-      }
+      // Use a flag to prevent double-fire (touch + mouse) on touch devices
+      let handledByTouch = false;
 
-      // Prevent focus steal from terminal (desktop)
-      toolbar.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        handleBtn(e.target.closest('button'));
-      });
-
-      // Mobile: handle on touchend
       toolbar.addEventListener('touchstart', (e) => {
         if (e.target.closest('button')) e.preventDefault();
       }, { passive: false });
 
       toolbar.addEventListener('touchend', (e) => {
         e.preventDefault();
+        handledByTouch = true;
         handleBtn(e.target.closest('button'));
       }, { passive: false });
+
+      toolbar.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        if (handledByTouch) { handledByTouch = false; return; }
+        handleBtn(e.target.closest('button'));
+      });
     }
 
     // --- WebSocket ---
