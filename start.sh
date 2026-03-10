@@ -13,7 +13,7 @@ fi
 if [ ! -d venv ]; then
   echo "Creating virtual environment..."
   python3 -m venv venv --with-pip
-  venv/bin/pip install aiohttp
+  venv/bin/pip install aiohttp asyncssh
 fi
 
 echo "Starting Web Terminal..."

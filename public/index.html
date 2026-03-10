@@ -74,6 +74,200 @@
       min-height: 20px;
     }
 
+    /* --- Connect Screen --- */
+    #connect-screen {
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      height: 100%;
+      padding: 20px;
+      overflow-y: auto;
+    }
+
+    #connect-screen h2 {
+      font-size: 1.3rem;
+      font-weight: 600;
+      color: #7aa2f7;
+      margin-bottom: 16px;
+    }
+
+    .connect-section {
+      width: 100%;
+      max-width: 420px;
+      margin-bottom: 20px;
+    }
+
+    .connect-section h3 {
+      font-size: 14px;
+      font-weight: 600;
+      color: #565f89;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 10px;
+    }
+
+    .connect-card {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
+      background: #24283b;
+      border: 1px solid #3b4261;
+      border-radius: 8px;
+      cursor: pointer;
+      margin-bottom: 8px;
+      transition: border-color 0.15s;
+    }
+
+    .connect-card:hover {
+      border-color: #7aa2f7;
+    }
+
+    .connect-card:active {
+      background: #292e42;
+    }
+
+    .connect-card .icon {
+      font-size: 20px;
+      width: 36px;
+      height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #1a1b26;
+      border-radius: 8px;
+      flex-shrink: 0;
+    }
+
+    .connect-card .info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .connect-card .info .name {
+      font-weight: 600;
+      color: #c0caf5;
+      font-size: 15px;
+    }
+
+    .connect-card .info .detail {
+      font-size: 12px;
+      color: #565f89;
+      margin-top: 2px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .connect-card .delete-btn {
+      padding: 4px 8px;
+      font-size: 12px;
+      background: none;
+      border: 1px solid #3b4261;
+      border-radius: 4px;
+      color: #f7768e;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
+    .connect-card .delete-btn:hover {
+      background: #f7768e;
+      color: #1a1b26;
+    }
+
+    /* --- SSH Form --- */
+    #ssh-form {
+      display: none;
+      width: 100%;
+      max-width: 420px;
+      padding: 0;
+    }
+
+    #ssh-form .form-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 10px;
+    }
+
+    #ssh-form .form-row.full > * { flex: 1; }
+
+    #ssh-form label {
+      display: block;
+      font-size: 12px;
+      color: #565f89;
+      margin-bottom: 4px;
+    }
+
+    #ssh-form input, #ssh-form select {
+      width: 100%;
+      padding: 12px 14px;
+      font-size: 15px;
+      border: 1px solid #3b4261;
+      border-radius: 8px;
+      background: #24283b;
+      color: #a9b1d6;
+      outline: none;
+    }
+
+    #ssh-form input:focus, #ssh-form select:focus {
+      border-color: #7aa2f7;
+    }
+
+    #ssh-form .btn-row {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+    }
+
+    #ssh-form .btn-row button {
+      flex: 1;
+      padding: 14px;
+      font-size: 15px;
+      font-weight: 600;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+
+    #ssh-connect-btn {
+      background: #9ece6a;
+      color: #1a1b26;
+    }
+
+    #ssh-connect-btn:active {
+      background: #7fb34e;
+    }
+
+    #ssh-cancel-btn {
+      background: #3b4261;
+      color: #a9b1d6;
+    }
+
+    #ssh-form .form-check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    #ssh-form .form-check input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+    }
+
+    #ssh-form .form-check label {
+      margin-bottom: 0;
+      font-size: 14px;
+      color: #a9b1d6;
+    }
+
+    #ssh-form .form-error {
+      color: #f7768e;
+      font-size: 13px;
+      min-height: 18px;
+      margin-top: 6px;
+    }
+
     /* --- Terminal --- */
     #terminal-screen {
       display: none;
@@ -103,9 +297,51 @@
     #status-dot.disconnected { background: #f7768e; }
     #status-dot.connecting { background: #e0af68; }
 
+    #session-info {
+      color: #565f89;
+      font-family: monospace;
+    }
+
+    #disconnect-btn {
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 600;
+      border: 1px solid #3b4261;
+      border-radius: 4px;
+      background: none;
+      color: #f7768e;
+      cursor: pointer;
+      margin-left: 8px;
+    }
+
+    #disconnect-btn:hover {
+      background: #f7768e;
+      color: #1a1b26;
+    }
+
     #terminal-container {
       flex: 1;
       overflow: hidden;
+      position: relative;
+    }
+
+    /* Visible scrollbar for drag scrolling */
+    .xterm-viewport {
+      -webkit-overflow-scrolling: touch !important;
+    }
+    .xterm-viewport::-webkit-scrollbar {
+      width: 12px;
+    }
+    .xterm-viewport::-webkit-scrollbar-track {
+      background: #1a1b26;
+    }
+    .xterm-viewport::-webkit-scrollbar-thumb {
+      background: #3b4261;
+      border-radius: 6px;
+      border: 2px solid #1a1b26;
+    }
+    .xterm-viewport::-webkit-scrollbar-thumb:active {
+      background: #7aa2f7;
     }
 
     /* --- Key Toolbar --- */
@@ -198,6 +434,27 @@
 
     .hidden { display: none !important; }
 
+    /* --- Scroll Overlay --- */
+    #scroll-overlay {
+      display: none;
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 5;
+      overflow-y: scroll;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    #scroll-overlay.active {
+      display: block;
+    }
+
+    #scroll-overlay-inner {
+      width: 100%;
+    }
+
     /* --- Select Overlay --- */
     #select-overlay {
       display: none;
@@ -268,13 +525,102 @@
     <div id="login-error"></div>
   </div>
 
+  <!-- Connect: choose local or SSH -->
+  <div id="connect-screen">
+    <h2>Select Connection</h2>
+
+    <!-- Local -->
+    <div class="connect-section">
+      <h3>Local</h3>
+      <div class="connect-card" id="local-connect-card">
+        <div class="icon">🖥</div>
+        <div class="info">
+          <div class="name">Local Terminal</div>
+          <div class="detail">bash on this server</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SSH Hosts -->
+    <div class="connect-section">
+      <h3>SSH Hosts</h3>
+      <div id="ssh-host-list"></div>
+      <div class="connect-card" id="new-ssh-card">
+        <div class="icon" style="color:#9ece6a;font-size:24px">+</div>
+        <div class="info">
+          <div class="name">New SSH Connection</div>
+          <div class="detail">Connect to a remote server</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SSH Form -->
+    <div id="ssh-form">
+      <div class="connect-section" style="margin-bottom:0">
+        <h3>SSH Connection</h3>
+      </div>
+      <div class="form-row">
+        <div style="flex:2">
+          <label>Host</label>
+          <input type="text" id="ssh-host" placeholder="192.168.1.100">
+        </div>
+        <div style="flex:1">
+          <label>Port</label>
+          <input type="number" id="ssh-port" value="22" min="1" max="65535">
+        </div>
+      </div>
+      <div class="form-row full">
+        <div>
+          <label>Username</label>
+          <input type="text" id="ssh-username" placeholder="root">
+        </div>
+      </div>
+      <div class="form-row full">
+        <div>
+          <label>Auth Type</label>
+          <select id="ssh-auth-type">
+            <option value="password">Password</option>
+            <option value="key">SSH Key (server path)</option>
+            <option value="agent">SSH Agent</option>
+          </select>
+        </div>
+      </div>
+      <div id="ssh-password-row" class="form-row full">
+        <div>
+          <label>Password</label>
+          <input type="password" id="ssh-password" placeholder="Password">
+        </div>
+      </div>
+      <div id="ssh-key-row" class="form-row full" style="display:none">
+        <div>
+          <label>Key Path (on server)</label>
+          <input type="text" id="ssh-key-path" placeholder="~/.ssh/id_rsa">
+        </div>
+      </div>
+      <div class="form-check">
+        <input type="checkbox" id="ssh-save-host">
+        <label for="ssh-save-host">Save this host</label>
+      </div>
+      <div class="form-error" id="ssh-error"></div>
+      <div class="btn-row">
+        <button id="ssh-cancel-btn">Cancel</button>
+        <button id="ssh-connect-btn">Connect</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Terminal -->
   <div id="terminal-screen">
     <div id="status-bar">
       <span><span id="status-dot"></span><span id="status-text">Connected</span></span>
-      <span id="session-info"></span>
+      <span>
+        <span id="session-info"></span>
+        <button id="disconnect-btn">Disconnect</button>
+      </span>
     </div>
-    <div id="terminal-container"></div>
+    <div id="terminal-container">
+      <div id="scroll-overlay"><div id="scroll-overlay-inner"></div></div>
+    </div>
     <div id="select-overlay">
       <div id="select-overlay-header">
         <button id="select-close-btn">Back</button>
@@ -307,6 +653,11 @@
       <button data-key="pipe">|</button>
       <button data-key="tilde">~</button>
       <button id="copy-btn" data-action="copy">Copy</button>
+      <button id="scroll-toggle-btn" data-action="scroll-toggle">Scr</button>
+      <button data-action="scroll-bottom">Bot</button>
+      <button data-cmd="tmux new -As main">tmux</button>
+      <button data-cmd="claude">cc</button>
+      <button data-cmd="claude --resume">ccr</button>
     </div>
   </div>
 
@@ -316,23 +667,28 @@
   <script>
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
 
-    // --- Login ---
+    // --- Screens ---
     const loginScreen = document.getElementById('login-screen');
+    const connectScreen = document.getElementById('connect-screen');
     const terminalScreen = document.getElementById('terminal-screen');
     const passwordInput = document.getElementById('password-input');
     const loginBtn = document.getElementById('login-btn');
     const loginError = document.getElementById('login-error');
     const statusDot = document.getElementById('status-dot');
     const statusText = document.getElementById('status-text');
+    const sessionInfo = document.getElementById('session-info');
+    const disconnectBtn = document.getElementById('disconnect-btn');
 
     let authToken = sessionStorage.getItem('terminal_token');
+    let currentConnection = null; // { mode, host?, username? }
 
     if (authToken) {
-      showTerminal();
+      showConnectScreen();
     } else {
       passwordInput.focus();
     }
 
+    // --- Login ---
     loginBtn.addEventListener('click', doLogin);
     passwordInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') doLogin();
@@ -354,7 +710,7 @@
         }
         authToken = data.token;
         sessionStorage.setItem('terminal_token', authToken);
-        showTerminal();
+        showConnectScreen();
       } catch (err) {
         loginError.textContent = 'Connection error';
       } finally {
@@ -362,26 +718,213 @@
       }
     }
 
+    // --- Connect Screen ---
+    function showConnectScreen() {
+      loginScreen.classList.add('hidden');
+      terminalScreen.style.display = 'none';
+      connectScreen.style.display = 'flex';
+      document.getElementById('ssh-form').style.display = 'none';
+      loadHostList();
+    }
+
+    // Local connect
+    document.getElementById('local-connect-card').addEventListener('click', () => {
+      currentConnection = { mode: 'local' };
+      showTerminal({ type: 'connect_local' });
+    });
+
+    // New SSH
+    document.getElementById('new-ssh-card').addEventListener('click', () => {
+      const form = document.getElementById('ssh-form');
+      form.style.display = 'block';
+      document.getElementById('ssh-host').focus();
+    });
+
+    document.getElementById('ssh-cancel-btn').addEventListener('click', () => {
+      document.getElementById('ssh-form').style.display = 'none';
+      document.getElementById('ssh-error').textContent = '';
+    });
+
+    // Auth type toggle
+    document.getElementById('ssh-auth-type').addEventListener('change', (e) => {
+      const val = e.target.value;
+      document.getElementById('ssh-password-row').style.display = val === 'password' ? '' : 'none';
+      document.getElementById('ssh-key-row').style.display = val === 'key' ? '' : 'none';
+    });
+
+    // SSH connect
+    document.getElementById('ssh-connect-btn').addEventListener('click', async () => {
+      const host = document.getElementById('ssh-host').value.trim();
+      const port = parseInt(document.getElementById('ssh-port').value) || 22;
+      const username = document.getElementById('ssh-username').value.trim();
+      const authType = document.getElementById('ssh-auth-type').value;
+      const password = document.getElementById('ssh-password').value;
+      const keyPath = document.getElementById('ssh-key-path').value.trim();
+      const saveHost = document.getElementById('ssh-save-host').checked;
+      const errorEl = document.getElementById('ssh-error');
+
+      errorEl.textContent = '';
+
+      if (!host) { errorEl.textContent = 'Host is required'; return; }
+      if (!username) { errorEl.textContent = 'Username is required'; return; }
+      if (authType === 'password' && !password) { errorEl.textContent = 'Password is required'; return; }
+      if (authType === 'key' && !keyPath) { errorEl.textContent = 'Key path is required'; return; }
+
+      // Save host preset if checked
+      if (saveHost) {
+        try {
+          await fetch('/api/hosts', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${authToken}`,
+            },
+            body: JSON.stringify({ host, port, username, auth_type: authType, key_path: keyPath }),
+          });
+        } catch { /* ignore save error */ }
+      }
+
+      currentConnection = { mode: 'ssh', host, username };
+      showTerminal({
+        type: 'connect_ssh',
+        host, port, username,
+        auth_type: authType,
+        password: authType === 'password' ? password : '',
+        key_path: authType === 'key' ? keyPath : '',
+      });
+    });
+
+    // Load saved hosts
+    async function loadHostList() {
+      const list = document.getElementById('ssh-host-list');
+      list.innerHTML = '';
+      try {
+        const res = await fetch('/api/hosts', {
+          headers: { 'Authorization': `Bearer ${authToken}` },
+        });
+        if (!res.ok) return;
+        const hosts = await res.json();
+        hosts.forEach((h) => {
+          const card = document.createElement('div');
+          card.className = 'connect-card';
+          card.innerHTML = `
+            <div class="icon" style="color:#bb9af7">⇄</div>
+            <div class="info">
+              <div class="name">${escapeHtml(h.name)}</div>
+              <div class="detail">${escapeHtml(h.host)}:${h.port} · ${escapeHtml(h.auth_type)}</div>
+            </div>
+            <button class="delete-btn" data-id="${escapeHtml(h.id)}">Del</button>
+          `;
+
+          // Click card to connect (not the delete button)
+          card.addEventListener('click', (e) => {
+            if (e.target.closest('.delete-btn')) return;
+            connectToSavedHost(h);
+          });
+
+          // Delete button
+          card.querySelector('.delete-btn').addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await fetch(`/api/hosts/${h.id}`, {
+              method: 'DELETE',
+              headers: { 'Authorization': `Bearer ${authToken}` },
+            });
+            loadHostList();
+          });
+
+          list.appendChild(card);
+        });
+      } catch { /* ignore */ }
+    }
+
+    function connectToSavedHost(h) {
+      if (h.auth_type === 'password') {
+        // Fill form for password entry
+        document.getElementById('ssh-host').value = h.host;
+        document.getElementById('ssh-port').value = h.port;
+        document.getElementById('ssh-username').value = h.username;
+        document.getElementById('ssh-auth-type').value = h.auth_type;
+        document.getElementById('ssh-auth-type').dispatchEvent(new Event('change'));
+        document.getElementById('ssh-password').value = '';
+        document.getElementById('ssh-key-path').value = h.key_path || '';
+        document.getElementById('ssh-save-host').checked = false;
+        document.getElementById('ssh-form').style.display = 'block';
+        document.getElementById('ssh-password').focus();
+      } else {
+        // Key or agent auth - connect directly
+        currentConnection = { mode: 'ssh', host: h.host, username: h.username };
+        showTerminal({
+          type: 'connect_ssh',
+          host: h.host,
+          port: h.port,
+          username: h.username,
+          auth_type: h.auth_type,
+          password: '',
+          key_path: h.key_path || '',
+        });
+      }
+    }
+
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
+    }
+
     // --- Terminal ---
     let term, fitAddon, ws;
     let reconnectTimer = null;
     let reconnectDelay = 1000;
-    let wsEverOpened = false;
+    let pendingConnectMsg = null;
 
-    function showTerminal() {
+    function showTerminal(connectMsg) {
+      pendingConnectMsg = connectMsg;
+      connectScreen.style.display = 'none';
       loginScreen.classList.add('hidden');
       terminalScreen.style.display = 'flex';
-      // Delay init to ensure layout is computed after display change
+
+      // Update session info
+      if (connectMsg.type === 'connect_ssh') {
+        sessionInfo.textContent = `${connectMsg.username}@${connectMsg.host}:${connectMsg.port || 22}`;
+      } else {
+        sessionInfo.textContent = 'local';
+      }
+
       setTimeout(() => {
         initTerminal();
         connectWS();
       }, 50);
     }
 
+    // Disconnect button -> back to connect screen
+    disconnectBtn.addEventListener('click', () => {
+      if (ws) {
+        ws.onclose = null; // prevent reconnect
+        ws.close();
+        ws = null;
+      }
+      if (term) {
+        term.dispose();
+        term = null;
+        fitAddon = null;
+      }
+      if (reconnectTimer) {
+        clearTimeout(reconnectTimer);
+        reconnectTimer = null;
+      }
+      showConnectScreen();
+    });
+
     function backToLogin(msg) {
       sessionStorage.removeItem('terminal_token');
       authToken = null;
+      if (term) {
+        term.dispose();
+        term = null;
+        fitAddon = null;
+      }
       terminalScreen.style.display = 'none';
+      connectScreen.style.display = 'none';
       loginScreen.classList.remove('hidden');
       loginError.textContent = msg || 'Please login again.';
       passwordInput.focus();
@@ -423,6 +966,8 @@
           brightWhite: '#c0caf5',
         },
         scrollback: 5000,
+        smoothScrollDuration: isMobile ? 100 : 0,
+        scrollSensitivity: isMobile ? 5 : 1,
         allowProposedApi: true,
       });
 
@@ -515,12 +1060,14 @@
         window.visualViewport.addEventListener('resize', handleResize);
       }
 
-      // Mobile: tap to focus keyboard
+      // Mobile: tap terminal to focus keyboard (only when scroll mode is off)
       if (isMobile) {
-        document.getElementById('terminal-container').addEventListener('touchstart', () => {
-          const textarea = document.querySelector('.xterm-helper-textarea');
-          if (textarea) textarea.focus({ preventScroll: true });
-        });
+        document.getElementById('terminal-container').addEventListener('touchend', (e) => {
+          if (!scrollMode && e.target.id !== 'scroll-overlay') {
+            const textarea = document.querySelector('.xterm-helper-textarea');
+            if (textarea) textarea.focus({ preventScroll: true });
+          }
+        }, { passive: true });
       }
 
       initKeyToolbar();
@@ -575,6 +1122,41 @@
 
     // --- Key Toolbar ---
     let ctrlSticky = false;
+    let scrollMode = false;
+
+    function setScrollMode(active) {
+      scrollMode = active;
+      const btn = document.getElementById('scroll-toggle-btn');
+      const overlay = document.getElementById('scroll-overlay');
+      const inner = document.getElementById('scroll-overlay-inner');
+      if (btn) btn.classList.toggle('sticky-active', active);
+
+      if (active && term) {
+        // Set inner height to match terminal's total scrollback
+        const lineHeight = Math.ceil(term.element.querySelector('.xterm-screen').offsetHeight / term.rows);
+        const totalLines = term.buffer.active.length;
+        inner.style.height = (totalLines * lineHeight) + 'px';
+
+        // Sync overlay scroll to terminal position
+        const viewportLine = term.buffer.active.viewportY;
+        overlay.scrollTop = viewportLine * lineHeight;
+
+        overlay.classList.add('active');
+
+        // Sync terminal scroll when overlay is scrolled
+        overlay._scrollHandler = () => {
+          const line = Math.round(overlay.scrollTop / lineHeight);
+          term.scrollToLine(line);
+        };
+        overlay.addEventListener('scroll', overlay._scrollHandler, { passive: true });
+      } else {
+        overlay.classList.remove('active');
+        if (overlay._scrollHandler) {
+          overlay.removeEventListener('scroll', overlay._scrollHandler);
+          overlay._scrollHandler = null;
+        }
+      }
+    }
 
     function setCtrlSticky(active) {
       ctrlSticky = active;
@@ -607,9 +1189,29 @@
       function handleBtn(btn) {
         if (!btn) return;
 
+        // Scroll toggle
+        if (btn.dataset.action === 'scroll-toggle') {
+          setScrollMode(!scrollMode);
+          return;
+        }
+
+        // Scroll to bottom
+        if (btn.dataset.action === 'scroll-bottom') {
+          if (term) term.scrollToBottom();
+          if (scrollMode) setScrollMode(false);
+          return;
+        }
+
         // Sticky Ctrl
         if (btn.dataset.sticky === 'ctrl') {
           setCtrlSticky(!ctrlSticky);
+          refocusTerminal();
+          return;
+        }
+
+        // Command shortcut
+        if (btn.dataset.cmd) {
+          sendInput(btn.dataset.cmd + '\r');
           refocusTerminal();
           return;
         }
@@ -660,20 +1262,25 @@
       ws = new WebSocket(`${protocol}//${location.host}/ws?token=${encodeURIComponent(authToken)}`);
 
       ws.onopen = () => {
-        wsEverOpened = true;
-        setStatus('connected', 'Connected');
+        setStatus('connecting', 'Authenticating...');
         reconnectDelay = 1000;
+
+        // Send connect message with terminal size
+        const msg = { ...pendingConnectMsg };
         if (term) {
-          fitAddon.fit();
-          term.focus();
-          ws.send(JSON.stringify({ type: 'resize', cols: term.cols, rows: term.rows }));
+          msg.cols = term.cols;
+          msg.rows = term.rows;
         }
+        ws.send(JSON.stringify(msg));
       };
 
       ws.onmessage = (event) => {
         try {
           const msg = JSON.parse(event.data);
-          if (msg.type === 'output') {
+          if (msg.type === 'connected') {
+            setStatus('connected', 'Connected');
+            if (term) term.focus();
+          } else if (msg.type === 'output') {
             term.write(msg.data);
           } else if (msg.type === 'exit') {
             term.write('\r\n\x1b[33m[Session ended]\x1b[0m\r\n');
@@ -693,19 +1300,28 @@
 
         // Max sessions
         if (event.code === 4002) {
-          term.write('\r\n\x1b[31m[Max sessions reached. Close other tabs and retry.]\x1b[0m\r\n');
+          if (term) term.write('\r\n\x1b[31m[Max sessions reached. Close other tabs and retry.]\x1b[0m\r\n');
           setStatus('disconnected', 'Max sessions');
           return;
         }
 
-        // Connection never opened - likely auth or server issue
-        if (!wsEverOpened) {
-          backToLogin('Connection failed. Please login again.');
+        // SSH connection failed
+        if (event.code === 4004) {
+          setStatus('disconnected', 'SSH failed');
+          // Auto back to connect screen after a moment
+          setTimeout(() => {
+            if (term) {
+              term.dispose();
+              term = null;
+              fitAddon = null;
+            }
+            showConnectScreen();
+          }, 2000);
           return;
         }
 
         setStatus('disconnected', 'Disconnected');
-        term.write('\r\n\x1b[31m[Disconnected. Reconnecting...]\x1b[0m\r\n');
+        if (term) term.write('\r\n\x1b[31m[Disconnected. Reconnecting...]\x1b[0m\r\n');
         reconnectTimer = setTimeout(() => {
           reconnectDelay = Math.min(reconnectDelay * 2, 30000);
           connectWS();
