@@ -326,9 +326,6 @@
     }
 
     /* Visible scrollbar for drag scrolling */
-    .xterm-viewport {
-      -webkit-overflow-scrolling: touch !important;
-    }
     .xterm-viewport::-webkit-scrollbar {
       width: 12px;
     }
@@ -342,6 +339,12 @@
     }
     .xterm-viewport::-webkit-scrollbar-thumb:active {
       background: #7aa2f7;
+    }
+
+    /* Toolbar hidden state */
+    #terminal-screen.toolbar-hidden #key-toolbar,
+    #terminal-screen.toolbar-hidden #text-input-bar {
+      display: none !important;
     }
 
     /* --- Key Toolbar --- */
@@ -915,6 +918,7 @@
       <span><span id="status-dot"></span><span id="status-text">Connected</span></span>
       <span>
         <span id="session-info"></span>
+        <button id="toolbar-toggle-btn" style="padding:2px 8px;font-size:11px;font-weight:600;border:1px solid #3b4261;border-radius:4px;background:none;color:#7aa2f7;cursor:pointer;margin-left:8px">KB</button>
         <button id="files-btn" style="padding:2px 8px;font-size:11px;font-weight:600;border:1px solid #3b4261;border-radius:4px;background:none;color:#9ece6a;cursor:pointer;margin-left:8px">Files</button>
         <button id="disconnect-btn">Disconnect</button>
       </span>
@@ -1308,7 +1312,7 @@
           brightWhite: '#c0caf5',
         },
         scrollback: 5000,
-        smoothScrollDuration: isMobile ? 100 : 0,
+        smoothScrollDuration: 0,
         scrollSensitivity: isMobile ? 5 : 1,
         allowProposedApi: true,
       });
@@ -1414,19 +1418,44 @@
 
       initKeyToolbar();
       initTextInput();
+      initToolbarToggle();
     }
 
+    function initToolbarToggle() {
+      const btn = document.getElementById('toolbar-toggle-btn');
+      const screen = document.getElementById('terminal-screen');
+      const hidden = localStorage.getItem('toolbar-hidden') === '1';
+      if (hidden) screen.classList.add('toolbar-hidden');
+      updateToggleBtn(btn, !hidden);
+
+      btn.addEventListener('click', () => {
+        const isHidden = screen.classList.toggle('toolbar-hidden');
+        localStorage.setItem('toolbar-hidden', isHidden ? '1' : '0');
+        updateToggleBtn(btn, !isHidden);
+        handleResize();
+      });
+    }
+
+    function updateToggleBtn(btn, visible) {
+      btn.style.color = visible ? '#7aa2f7' : '#565f89';
+    }
+
+    let resizeRaf = null;
     function handleResize() {
-      if (!fitAddon) return;
-      const container = document.getElementById('terminal-container');
-      if (window.visualViewport) {
-        const statusBar = document.getElementById('status-bar');
-        const toolbar = document.getElementById('key-toolbar');
-        const textBar = document.getElementById('text-input-bar');
-        const used = statusBar.offsetHeight + toolbar.offsetHeight + textBar.offsetHeight;
-        container.style.height = (window.visualViewport.height - used) + 'px';
-      }
-      fitAddon.fit();
+      if (resizeRaf) return;
+      resizeRaf = requestAnimationFrame(() => {
+        resizeRaf = null;
+        if (!fitAddon) return;
+        const container = document.getElementById('terminal-container');
+        if (window.visualViewport) {
+          const statusBar = document.getElementById('status-bar');
+          const toolbar = document.getElementById('key-toolbar');
+          const textBar = document.getElementById('text-input-bar');
+          const used = statusBar.offsetHeight + toolbar.offsetHeight + textBar.offsetHeight;
+          container.style.height = (window.visualViewport.height - used) + 'px';
+        }
+        fitAddon.fit();
+      });
     }
 
     // --- Text Input Bar ---
@@ -1466,6 +1495,8 @@
     let ctrlSticky = false;
     let scrollMode = false;
 
+    let scrollOverlayWriteDisposable = null;
+
     function setScrollMode(active) {
       scrollMode = active;
       const btn = document.getElementById('scroll-toggle-btn');
@@ -1474,10 +1505,21 @@
       if (btn) btn.classList.toggle('sticky-active', active);
 
       if (active && term) {
-        // Set inner height to match terminal's total scrollback
+        // Block scroll mode in alternate screen buffer (TUI apps like claude, vim, etc.)
+        if (term.buffer.active.type !== 'normal') {
+          scrollMode = false;
+          if (btn) btn.classList.remove('sticky-active');
+          return;
+        }
+
         const lineHeight = Math.ceil(term.element.querySelector('.xterm-screen').offsetHeight / term.rows);
-        const totalLines = term.buffer.active.length;
-        inner.style.height = (totalLines * lineHeight) + 'px';
+
+        function syncOverlayHeight() {
+          const totalLines = term.buffer.active.length;
+          inner.style.height = (totalLines * lineHeight) + 'px';
+        }
+
+        syncOverlayHeight();
 
         // Sync overlay scroll to terminal position
         const viewportLine = term.buffer.active.viewportY;
@@ -1491,11 +1533,26 @@
           term.scrollToLine(line);
         };
         overlay.addEventListener('scroll', overlay._scrollHandler, { passive: true });
+
+        // Dynamically update inner height as new output arrives
+        scrollOverlayWriteDisposable = term.onWriteParsed(() => {
+          if (!scrollMode) return;
+          // Auto-disable if switched to alternate screen
+          if (term.buffer.active.type !== 'normal') {
+            setScrollMode(false);
+            return;
+          }
+          syncOverlayHeight();
+        });
       } else {
         overlay.classList.remove('active');
         if (overlay._scrollHandler) {
           overlay.removeEventListener('scroll', overlay._scrollHandler);
           overlay._scrollHandler = null;
+        }
+        if (scrollOverlayWriteDisposable) {
+          scrollOverlayWriteDisposable.dispose();
+          scrollOverlayWriteDisposable = null;
         }
       }
     }
