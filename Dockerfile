@@ -13,4 +13,4 @@ COPY public/ public/
 
 EXPOSE 8080
 
-CMD ["python", "server.py"]
+CMD ["python", "/app/server.py"]
