@@ -1244,7 +1244,10 @@
 
     // Disconnect button -> back to connect screen
     disconnectBtn.addEventListener('click', () => {
+      sessionStorage.removeItem('wt_session_id');
       if (ws) {
+        // Send explicit disconnect before closing
+        try { ws.send(JSON.stringify({ type: 'disconnect' })); } catch {}
         ws.onclose = null; // prevent reconnect
         ws.close();
         ws = null;
@@ -1258,6 +1261,7 @@
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
       }
+      isReconnectAttempt = false;
       showConnectScreen();
     });
 
@@ -1645,13 +1649,15 @@
     }
 
     // --- WebSocket ---
+    let isReconnectAttempt = false;
+
     function connectWS() {
       if (reconnectTimer) {
         clearTimeout(reconnectTimer);
         reconnectTimer = null;
       }
 
-      setStatus('connecting', 'Connecting...');
+      setStatus('connecting', isReconnectAttempt ? 'Reconnecting...' : 'Connecting...');
 
       const protocol = location.protocol === 'https:' ? 'wss:' : 'ws:';
       ws = new WebSocket(`${protocol}//${location.host}/ws?token=${encodeURIComponent(authToken)}`);
@@ -1660,13 +1666,24 @@
         setStatus('connecting', 'Authenticating...');
         reconnectDelay = 1000;
 
-        // Send connect message with terminal size
-        const msg = { ...pendingConnectMsg };
-        if (term) {
-          msg.cols = term.cols;
-          msg.rows = term.rows;
+        // Try reconnect if we have a previous session
+        const savedSessionId = sessionStorage.getItem('wt_session_id');
+        if (isReconnectAttempt && savedSessionId) {
+          const msg = { type: 'reconnect', session_id: savedSessionId };
+          if (term) {
+            msg.cols = term.cols;
+            msg.rows = term.rows;
+          }
+          ws.send(JSON.stringify(msg));
+        } else {
+          // New session
+          const msg = { ...pendingConnectMsg };
+          if (term) {
+            msg.cols = term.cols;
+            msg.rows = term.rows;
+          }
+          ws.send(JSON.stringify(msg));
         }
-        ws.send(JSON.stringify(msg));
       };
 
       ws.onmessage = (event) => {
@@ -1674,13 +1691,33 @@
           const msg = JSON.parse(event.data);
           if (msg.type === 'connected') {
             setStatus('connected', 'Connected');
-            if (msg.session_id) currentSessionId = msg.session_id;
+            if (msg.session_id) {
+              currentSessionId = msg.session_id;
+              sessionStorage.setItem('wt_session_id', msg.session_id);
+            }
+            isReconnectAttempt = false;
             if (term) term.focus();
+          } else if (msg.type === 'reconnected') {
+            setStatus('connected', 'Reconnected');
+            if (msg.session_id) {
+              currentSessionId = msg.session_id;
+              sessionStorage.setItem('wt_session_id', msg.session_id);
+            }
+            isReconnectAttempt = false;
+            if (term) term.focus();
+          } else if (msg.type === 'reconnect_failed') {
+            // Reconnect failed — fall back to new session
+            isReconnectAttempt = false;
+            sessionStorage.removeItem('wt_session_id');
+            if (ws) { ws.onclose = null; ws.close(); ws = null; }
+            connectWS();
+            return;
           } else if (msg.type === 'output') {
             term.write(msg.data);
           } else if (msg.type === 'exit') {
             term.write('\r\n\x1b[33m[Session ended]\x1b[0m\r\n');
             setStatus('disconnected', 'Session ended');
+            sessionStorage.removeItem('wt_session_id');
           } else if (msg.type === 'error') {
             term.write(`\r\n\x1b[31m[Error: ${msg.data}]\x1b[0m\r\n`);
           }
@@ -1690,6 +1727,7 @@
       ws.onclose = (event) => {
         // Auth failure
         if (event.code === 4001) {
+          sessionStorage.removeItem('wt_session_id');
           backToLogin('Session expired. Please login again.');
           return;
         }
@@ -1704,6 +1742,7 @@
         // SSH connection failed
         if (event.code === 4004) {
           setStatus('disconnected', 'SSH failed');
+          sessionStorage.removeItem('wt_session_id');
           // Auto back to connect screen after a moment
           setTimeout(() => {
             if (term) {
@@ -1716,8 +1755,10 @@
           return;
         }
 
+        // Network drop / screen lock — try reconnect
         setStatus('disconnected', 'Disconnected');
-        if (term) term.write('\r\n\x1b[31m[Disconnected. Reconnecting...]\x1b[0m\r\n');
+        if (term) term.write('\r\n\x1b[33m[Disconnected. Reconnecting...]\x1b[0m\r\n');
+        isReconnectAttempt = true;
         reconnectTimer = setTimeout(() => {
           reconnectDelay = Math.min(reconnectDelay * 2, 30000);
           connectWS();

@@ -6,9 +6,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir aiohttp
+RUN pip install --no-cache-dir aiohttp asyncssh
 
-COPY server.py .
+COPY server.py file_manager.py ./
 COPY public/ public/
 
 EXPOSE 8080

@@ -11,6 +11,7 @@ import signal
 import struct
 import termios
 import time
+from collections import deque
 from pathlib import Path
 
 import asyncssh
@@ -39,6 +40,8 @@ SHELL = os.environ.get('SHELL_PATH', '/bin/bash')
 MAX_SESSIONS = int(os.environ.get('MAX_SESSIONS', '5'))
 UPLOAD_MAX_SIZE = int(os.environ.get('UPLOAD_MAX_SIZE', str(100 * 1024 * 1024)))  # 100MB
 SFTP_LOCAL_ROOT = os.environ.get('SFTP_LOCAL_ROOT', '') or None
+SESSION_PERSIST_TIMEOUT = int(os.environ.get('SESSION_PERSIST_TIMEOUT', '300'))  # 5 min
+SESSION_BUFFER_SIZE = int(os.environ.get('SESSION_BUFFER_SIZE', '100'))  # max output chunks
 HOSTS_FILE = Path(__file__).parent / 'hosts.json'
 
 if not PASSWORD:
@@ -349,11 +352,12 @@ active_session_count = 0
 
 
 class PtySession:
-    def __init__(self, ws: web.WebSocketResponse):
-        self.ws = ws
+    def __init__(self):
         self.master_fd: int | None = None
         self.pid: int | None = None
         self.running = False
+        self.on_output = None  # callback: async (str) -> None
+        self.on_exit = None    # callback: async (int) -> None
 
     def spawn(self) -> None:
         env = os.environ.copy()
@@ -393,6 +397,15 @@ class PtySession:
         if self.master_fd is not None:
             os.write(self.master_fd, data.encode())
 
+    def is_alive(self) -> bool:
+        if self.pid is None:
+            return False
+        try:
+            os.kill(self.pid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+
     def kill(self) -> None:
         self.running = False
         if self.pid is not None:
@@ -417,7 +430,8 @@ class PtySession:
                     data = os.read(self.master_fd, 4096)
                     if not data:
                         break
-                    await self.ws.send_json({'type': 'output', 'data': data.decode('utf-8', errors='replace')})
+                    if self.on_output:
+                        await self.on_output(data.decode('utf-8', errors='replace'))
                 except BlockingIOError:
                     await asyncio.sleep(0.01)
                 except OSError:
@@ -426,26 +440,27 @@ class PtySession:
             pass
 
         # Wait for child process
+        exit_code = -1
         if self.pid is not None:
             try:
                 _, status = os.waitpid(self.pid, os.WNOHANG)
             except ChildProcessError:
                 status = 0
-
             exit_code = os.WEXITSTATUS(status) if os.WIFEXITED(status) else -1
-            try:
-                await self.ws.send_json({'type': 'exit', 'code': exit_code})
-            except Exception:
-                pass
+
+        self.running = False
+        if self.on_exit:
+            await self.on_exit(exit_code)
 
 
 # --- SSH Session (Remote) ---
 class SSHSession:
-    def __init__(self, ws: web.WebSocketResponse):
-        self.ws = ws
+    def __init__(self):
         self.conn: asyncssh.SSHClientConnection | None = None
         self.process: asyncssh.SSHClientProcess | None = None
         self.running = False
+        self.on_output = None  # callback: async (str) -> None
+        self.on_exit = None    # callback: async (int) -> None
 
     async def connect(self, host: str, port: int, username: str,
                       auth_type: str = 'password', password: str = '',
@@ -455,6 +470,7 @@ class SSHSession:
             'port': port,
             'username': username,
             'known_hosts': None,  # Accept all host keys (user already authenticated to web terminal)
+            'keepalive_interval': 30,
         }
 
         if auth_type == 'key' and key_path:
@@ -485,6 +501,9 @@ class SSHSession:
         if self.process is not None and self.process.stdin is not None:
             self.process.stdin.write(data.encode())
 
+    def is_alive(self) -> bool:
+        return self.running and self.process is not None
+
     def kill(self) -> None:
         self.running = False
         if self.process is not None:
@@ -511,10 +530,8 @@ class SSHSession:
                     )
                     if not data:
                         break
-                    await self.ws.send_json({
-                        'type': 'output',
-                        'data': data.decode('utf-8', errors='replace'),
-                    })
+                    if self.on_output:
+                        await self.on_output(data.decode('utf-8', errors='replace'))
                 except asyncio.TimeoutError:
                     continue
                 except asyncssh.BreakReceived:
@@ -526,13 +543,102 @@ class SSHSession:
         except Exception:
             pass
 
-        try:
-            await self.ws.send_json({'type': 'exit', 'code': 0})
-        except Exception:
-            pass
+        self.running = False
+        if self.on_exit:
+            await self.on_exit(0)
+
+
+# --- Persistent Session Wrapper ---
+persistent_sessions: dict[str, 'PersistentSession'] = {}
+
+
+class PersistentSession:
+    def __init__(self, session_id: str, session: PtySession | SSHSession, mode: str):
+        self.session_id = session_id
+        self.session = session
+        self.mode = mode
+        self.ws: web.WebSocketResponse | None = None
+        self.output_buffer: deque[str] = deque(maxlen=SESSION_BUFFER_SIZE)
+        self.created_at = time.time()
+        self.last_active = time.time()
+        self.exited = False
+        self.exit_code = -1
+        self.read_task: asyncio.Task | None = None
+        self._lock = asyncio.Lock()
+
+        # Wire up callbacks
+        session.on_output = self._handle_output
+        session.on_exit = self._handle_exit
+
+    async def _handle_output(self, data: str) -> None:
+        self.last_active = time.time()
+        self.output_buffer.append(data)
+        async with self._lock:
+            if self.ws is not None:
+                try:
+                    await self.ws.send_json({'type': 'output', 'data': data})
+                except (ConnectionResetError, Exception):
+                    self.ws = None
+
+    async def _handle_exit(self, exit_code: int) -> None:
+        self.exited = True
+        self.exit_code = exit_code
+        async with self._lock:
+            if self.ws is not None:
+                try:
+                    await self.ws.send_json({'type': 'exit', 'code': exit_code})
+                except Exception:
+                    pass
+
+    def attach_ws(self, ws: web.WebSocketResponse) -> None:
+        self.ws = ws
+        self.last_active = time.time()
+
+    def detach_ws(self) -> None:
+        self.ws = None
+        self.last_active = time.time()
+
+    def is_alive(self) -> bool:
+        return not self.exited and self.session.is_alive()
+
+    def start_read_loop(self) -> None:
+        if self.read_task is not None:
+            self.read_task.cancel()
+        self.read_task = asyncio.create_task(self.session.read_loop())
+
+    def kill(self) -> None:
+        self.session.kill()
+        if self.read_task is not None:
+            self.read_task.cancel()
+            self.read_task = None
+
+
+async def cleanup_stale_sessions() -> None:
+    """Periodically remove disconnected sessions that exceeded timeout."""
+    global active_session_count
+    while True:
+        await asyncio.sleep(30)
+        now = time.time()
+        to_remove = []
+        for sid, ps in persistent_sessions.items():
+            # No WebSocket attached and timed out, or process already dead
+            if ps.ws is None and (now - ps.last_active) > SESSION_PERSIST_TIMEOUT:
+                to_remove.append(sid)
+            elif ps.exited and ps.ws is None:
+                to_remove.append(sid)
+        for sid in to_remove:
+            ps = persistent_sessions.pop(sid, None)
+            if ps:
+                ps.kill()
+                active_sessions.pop(sid, None)
+                active_session_count = max(0, active_session_count - 1)
+                log.info(f'Stale session cleaned: {sid[:8]}... (active: {active_session_count})')
 
 
 # --- WebSocket Handler ---
+CLOSE_CODE_EXPLICIT_DISCONNECT = 4100
+
+
 @routes.get('/ws')
 async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
     global active_session_count
@@ -551,13 +657,9 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
         await ws.close(code=4001, message=b'Token expired')
         return ws
 
-    if active_session_count >= MAX_SESSIONS:
-        await ws.close(code=4002, message=b'Max sessions reached')
-        return ws
-
     # Wait for connect message to determine session type
-    session = None
-    read_task = None
+    ps: PersistentSession | None = None
+    explicit_disconnect = False
     session_id = secrets.token_urlsafe(16)
 
     try:
@@ -570,9 +672,55 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
         connect_data = json.loads(first_msg.data)
         mode = connect_data.get('type', '')
 
-        if mode == 'connect_ssh':
+        # --- Reconnect to existing session ---
+        if mode == 'reconnect':
+            old_sid = connect_data.get('session_id', '')
+            old_ps = persistent_sessions.get(old_sid)
+            if old_ps and old_ps.is_alive():
+                # Detach old WebSocket if still attached
+                if old_ps.ws is not None:
+                    try:
+                        await old_ps.ws.close()
+                    except Exception:
+                        pass
+                old_ps.attach_ws(ws)
+                session_id = old_sid
+                ps = old_ps
+
+                # Send buffered output
+                buffered = list(old_ps.output_buffer)
+                await ws.send_json({
+                    'type': 'reconnected',
+                    'mode': old_ps.mode,
+                    'session_id': session_id,
+                    'buffered_count': len(buffered),
+                })
+                for chunk in buffered:
+                    try:
+                        await ws.send_json({'type': 'output', 'data': chunk})
+                    except Exception:
+                        break
+                old_ps.output_buffer.clear()
+
+                # Resize if provided
+                if connect_data.get('cols') and connect_data.get('rows'):
+                    old_ps.session.resize(int(connect_data['cols']), int(connect_data['rows']))
+
+                log.info(f'Session reconnected: {session_id[:8]}...')
+            else:
+                # Session not found or dead
+                await ws.send_json({'type': 'reconnect_failed', 'reason': 'session_not_found'})
+                # Client should fall back to new session — close this ws
+                await ws.close()
+                return ws
+
+        elif mode == 'connect_ssh':
+            if active_session_count >= MAX_SESSIONS:
+                await ws.close(code=4002, message=b'Max sessions reached')
+                return ws
+
             # SSH session
-            ssh_session = SSHSession(ws)
+            ssh_session = SSHSession()
             try:
                 await ssh_session.connect(
                     host=str(connect_data.get('host', '')),
@@ -601,7 +749,11 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
             fm = SFTPFileManager(sftp_client) if sftp_client else None
             active_sessions[session_id] = {'mode': 'ssh', 'conn': ssh_session.conn, 'fm': fm}
 
-            session = ssh_session
+            ps = PersistentSession(session_id, ssh_session, 'ssh')
+            ps.attach_ws(ws)
+            persistent_sessions[session_id] = ps
+            ps.start_read_loop()
+
             active_session_count += 1
             label = f"{connect_data.get('username')}@{connect_data.get('host')}"
             log.info(f'SSH opened ({label}, active: {active_session_count})')
@@ -612,14 +764,22 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
             })
 
         elif mode == 'connect_local':
+            if active_session_count >= MAX_SESSIONS:
+                await ws.close(code=4002, message=b'Max sessions reached')
+                return ws
+
             # Local PTY session
-            pty_session = PtySession(ws)
+            pty_session = PtySession()
             pty_session.spawn()
 
             fm = LocalFileManager(root=SFTP_LOCAL_ROOT)
             active_sessions[session_id] = {'mode': 'local', 'conn': None, 'fm': fm}
 
-            session = pty_session
+            ps = PersistentSession(session_id, pty_session, 'local')
+            ps.attach_ws(ws)
+            persistent_sessions[session_id] = ps
+            ps.start_read_loop()
+
             active_session_count += 1
             log.info(f'PTY opened (pid: {pty_session.pid}, active: {active_session_count})')
             await ws.send_json({'type': 'connected', 'mode': 'local', 'session_id': session_id})
@@ -628,12 +788,9 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
             await ws.close(code=4003, message=b'Invalid connect type')
             return ws
 
-        # Start reading output
-        read_task = asyncio.create_task(session.read_loop())
-
-        # Send initial resize if provided
-        if connect_data.get('cols') and connect_data.get('rows'):
-            session.resize(int(connect_data['cols']), int(connect_data['rows']))
+        # Send initial resize if provided (for new sessions)
+        if mode != 'reconnect' and connect_data.get('cols') and connect_data.get('rows'):
+            ps.session.resize(int(connect_data['cols']), int(connect_data['rows']))
 
         # Message loop
         async for msg in ws:
@@ -641,11 +798,14 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
                 try:
                     data = json.loads(msg.data)
                     if data.get('type') == 'input' and isinstance(data.get('data'), str):
-                        session.write(data['data'])
+                        ps.session.write(data['data'])
                     elif data.get('type') == 'resize':
                         cols = int(data.get('cols', 80))
                         rows = int(data.get('rows', 24))
-                        session.resize(cols, rows)
+                        ps.session.resize(cols, rows)
+                    elif data.get('type') == 'disconnect':
+                        explicit_disconnect = True
+                        break
                 except (json.JSONDecodeError, ValueError):
                     pass
             elif msg.type in (web.WSMsgType.ERROR, web.WSMsgType.CLOSE):
@@ -655,17 +815,18 @@ async def websocket_handler(request: web.Request) -> web.WebSocketResponse:
         await ws.close(code=4003, message=b'Connect timeout')
         return ws
     finally:
-        if session is not None:
-            session.kill()
-            if read_task is not None:
-                read_task.cancel()
-                try:
-                    await read_task
-                except asyncio.CancelledError:
-                    pass
-            active_sessions.pop(session_id, None)
-            active_session_count -= 1
-            log.info(f'Session closed (active: {active_session_count})')
+        if ps is not None:
+            if explicit_disconnect:
+                # User explicitly disconnected — kill the session
+                ps.kill()
+                persistent_sessions.pop(session_id, None)
+                active_sessions.pop(session_id, None)
+                active_session_count -= 1
+                log.info(f'Session killed (explicit disconnect, active: {active_session_count})')
+            else:
+                # Network drop / screen lock — keep session alive
+                ps.detach_ws()
+                log.info(f'Session detached: {session_id[:8]}... (persisted for {SESSION_PERSIST_TIMEOUT}s)')
 
     return ws
 
@@ -683,6 +844,22 @@ async def index_handler(request: web.Request) -> web.Response:
 app = web.Application()
 app.router.add_routes(routes)
 app.router.add_static('/static', Path(__file__).parent / 'public')
+
+
+async def on_startup(app: web.Application) -> None:
+    app['cleanup_task'] = asyncio.create_task(cleanup_stale_sessions())
+
+
+async def on_cleanup(app: web.Application) -> None:
+    app['cleanup_task'].cancel()
+    # Kill all persistent sessions
+    for sid, ps in list(persistent_sessions.items()):
+        ps.kill()
+    persistent_sessions.clear()
+
+
+app.on_startup.append(on_startup)
+app.on_cleanup.append(on_cleanup)
 
 if __name__ == '__main__':
     import socket
