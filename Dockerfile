@@ -8,6 +8,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 ENV LANG=ko_KR.UTF-8 LC_ALL=ko_KR.UTF-8
 
+RUN useradd -u 1000 -m ck
+
 WORKDIR /app
 
 RUN pip install --no-cache-dir aiohttp asyncssh
