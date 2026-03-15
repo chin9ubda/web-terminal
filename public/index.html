@@ -1445,6 +1445,7 @@
     }
 
     let resizeRaf = null;
+    let scrollRestoreRaf = null;
     function handleResize() {
       if (resizeRaf) return;
       resizeRaf = requestAnimationFrame(() => {
@@ -1465,12 +1466,19 @@
         }
         fitAddon.fit();
 
-        // Restore scroll position after fit
-        if (isAtBottom) {
-          term.scrollToBottom();
-        } else {
-          term.scrollToLine(savedViewportY);
-        }
+        // Cancel pending restore from a previous resize
+        if (scrollRestoreRaf) cancelAnimationFrame(scrollRestoreRaf);
+
+        // Restore scroll AFTER xterm.js finishes its async render pass
+        scrollRestoreRaf = requestAnimationFrame(() => {
+          scrollRestoreRaf = null;
+          if (!term) return;
+          if (isAtBottom) {
+            term.scrollToBottom();
+          } else {
+            term.scrollToLine(savedViewportY);
+          }
+        });
       });
     }
 
