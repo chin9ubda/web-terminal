@@ -1449,7 +1449,12 @@
       if (resizeRaf) return;
       resizeRaf = requestAnimationFrame(() => {
         resizeRaf = null;
-        if (!fitAddon) return;
+        if (!fitAddon || !term) return;
+
+        // Save scroll position before fit
+        const savedViewportY = term.buffer.active.viewportY;
+        const isAtBottom = savedViewportY >= term.buffer.active.baseY;
+
         const container = document.getElementById('terminal-container');
         if (window.visualViewport) {
           const statusBar = document.getElementById('status-bar');
@@ -1459,6 +1464,13 @@
           container.style.height = (window.visualViewport.height - used) + 'px';
         }
         fitAddon.fit();
+
+        // Restore scroll position after fit
+        if (isAtBottom) {
+          term.scrollToBottom();
+        } else {
+          term.scrollToLine(savedViewportY);
+        }
       });
     }
 
